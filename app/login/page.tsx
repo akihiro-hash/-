@@ -1,8 +1,4 @@
-export const dynamic = "force-dynamic";
-
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const params = await searchParams;
-
+export default function LoginPage() {
   return (
     <main className="login-shell">
       <section className="login-panel">
@@ -12,7 +8,6 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <p className="muted">スタッフの打刻・有給申請と、管理者の月次確認をまとめて扱えます。</p>
         </div>
         <form action="/api/auth/login" method="post" className="stack">
-          {params.error && <p className="error-box">メールアドレスまたはパスワードが違います。</p>}
           <label>
             メールアドレス
             <input name="email" type="email" defaultValue="admin@example.com" required />
