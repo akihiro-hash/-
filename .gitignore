@@ -1,0 +1,12 @@
+node_modules
+.next
+.env
+.env.local
+.env.production
+*.db
+*.db-journal
+data/*.json
+dev-server*.log
+tsconfig.tsbuildinfo
+dist
+coverage
