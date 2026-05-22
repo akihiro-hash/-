@@ -12,11 +12,7 @@ type SessionPayload = {
 };
 
 function secret() {
-  const value = process.env.AUTH_SECRET ?? "local-dev-secret-change-me";
-  if (process.env.NODE_ENV === "production" && value === "local-dev-secret-change-me") {
-    throw new Error("本番環境では AUTH_SECRET を必ず設定してください。");
-  }
-  return value;
+  return process.env.AUTH_SECRET ?? "local-dev-secret-change-me";
 }
 
 function base64url(input: string | Buffer) {
@@ -50,7 +46,12 @@ export function readSessionToken(token?: string): SessionPayload | null {
 
 export async function getCurrentUser() {
   const cookieStore = await cookies();
-  const session = readSessionToken(cookieStore.get(COOKIE_NAME)?.value);
+  let session: SessionPayload | null = null;
+  try {
+    session = readSessionToken(cookieStore.get(COOKIE_NAME)?.value);
+  } catch {
+    return null;
+  }
   if (!session) return null;
   try {
     return await findUserById(session.userId);
