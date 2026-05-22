@@ -1,11 +1,6 @@
-import { getCurrentUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
-
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const user = await getCurrentUser();
-  if (user) redirect(user.role === "ADMIN" ? "/admin" : "/staff");
   const params = await searchParams;
 
   return (
