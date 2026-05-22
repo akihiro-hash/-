@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String             @id @default(cuid())
+  name              String
+  email             String             @unique
+  passwordHash      String
+  role              String             @default("STAFF")
+  department        String
+  hireDate          DateTime
+  weeklyWorkDays    Int
+  weeklyWorkHours   Float
+  employmentStatus  String             @default("ACTIVE")
+  jobTitle          String             @default("その他")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  workSettings      WorkSetting[]
+  attendanceRecords AttendanceRecord[]
+  correctionRequests CorrectionRequest[]
+  correctionLogs    CorrectionLog[]    @relation("CorrectionLogUser")
+  actedCorrectionLogs CorrectionLog[]  @relation("CorrectionLogActor")
+  leaveGrants       PaidLeaveGrant[]
+  leaveRequests     PaidLeaveRequest[]
+  leaveUsages       PaidLeaveUsage[]
+  approvedLeaves    PaidLeaveRequest[] @relation("LeaveApprover")
+  approvedCorrections CorrectionRequest[] @relation("CorrectionApprover")
+  auditLogs         AuditLog[]
+}
+
+model WorkSetting {
+  id              String   @id @default(cuid())
+  userId          String
+  effectiveFrom   DateTime
+  weeklyWorkDays  Int
+  weeklyWorkHours Float
+  department      String
+  jobTitle        String   @default("その他")
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, effectiveFrom])
+}
+
+model AttendanceRecord {
+  id              String              @id @default(cuid())
+  userId          String
+  workDate        DateTime
+  clockInAt       DateTime?
+  clockOutAt      DateTime?
+  totalBreakMins  Int                 @default(0)
+  workMins        Int                 @default(0)
+  overtimeMins    Int                 @default(0)
+  nightMins       Int                 @default(0)
+  status          String              @default("PENDING")
+  onCall          Boolean             @default(false)
+  emergencyVisits Int                 @default(0)
+  note            String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  user            User                @relation(fields: [userId], references: [id])
+  breaks          BreakRecord[]
+  correctionRequests CorrectionRequest[]
+
+  @@unique([userId, workDate])
+  @@index([workDate])
+}
+
+model CorrectionLog {
+  id                String   @id @default(cuid())
+  userId            String
+  targetDate        DateTime
+  actorId           String
+  actorRole         String
+  beforeClockInAt   DateTime?
+  beforeClockOutAt  DateTime?
+  afterClockInAt    DateTime?
+  afterClockOutAt   DateTime?
+  reason            String
+  createdAt         DateTime @default(now())
+  user              User     @relation("CorrectionLogUser", fields: [userId], references: [id])
+  actor             User     @relation("CorrectionLogActor", fields: [actorId], references: [id])
+
+  @@index([targetDate])
+}
+
+model BreakRecord {
+  id                 String           @id @default(cuid())
+  attendanceRecordId String
+  startAt            DateTime
+  endAt              DateTime?
+  createdAt          DateTime         @default(now())
+  attendanceRecord   AttendanceRecord @relation(fields: [attendanceRecordId], references: [id])
+}
+
+model CorrectionRequest {
+  id                 String           @id @default(cuid())
+  userId             String
+  attendanceRecordId String?
+  targetDate         DateTime
+  requestedClockInAt DateTime?
+  requestedClockOutAt DateTime?
+  reason             String
+  status             String           @default("PENDING")
+  approverId         String?
+  reviewedAt         DateTime?
+  reviewerNote       String?
+  createdAt          DateTime         @default(now())
+  user               User             @relation(fields: [userId], references: [id])
+  attendanceRecord   AttendanceRecord? @relation(fields: [attendanceRecordId], references: [id])
+  approver           User?            @relation("CorrectionApprover", fields: [approverId], references: [id])
+}
+
+model PaidLeaveGrant {
+  id              String           @id @default(cuid())
+  userId          String
+  grantDate       DateTime
+  expiresAt       DateTime
+  grantedMinutes  Int
+  remainingMinutes Int
+  source          String
+  status          String           @default("CONFIRMED")
+  note            String?
+  leaveType       String           @default("PAID_LEAVE")
+  createdAt       DateTime         @default(now())
+  user            User             @relation(fields: [userId], references: [id])
+  usages          PaidLeaveUsage[]
+
+  @@index([expiresAt])
+}
+
+model PaidLeaveRequest {
+  id              String          @id @default(cuid())
+  userId          String
+  leaveType       String          @default("PAID_LEAVE")
+  unit            String
+  halfDayPeriod   String?
+  startAt         DateTime
+  endAt           DateTime
+  requestedMinutes Int
+  reason          String
+  status          String          @default("PENDING")
+  approverId      String?
+  reviewedAt      DateTime?
+  reviewerNote    String?
+  createdAt       DateTime        @default(now())
+  user            User            @relation(fields: [userId], references: [id])
+  approver        User?           @relation("LeaveApprover", fields: [approverId], references: [id])
+  usages          PaidLeaveUsage[]
+
+  @@index([startAt])
+}
+
+model PaidLeaveUsage {
+  id                 String           @id @default(cuid())
+  userId             String
+  paidLeaveGrantId   String
+  paidLeaveRequestId String
+  usedMinutes        Int
+  usedAt             DateTime
+  user               User             @relation(fields: [userId], references: [id])
+  grant              PaidLeaveGrant    @relation(fields: [paidLeaveGrantId], references: [id])
+  request            PaidLeaveRequest  @relation(fields: [paidLeaveRequestId], references: [id])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  action      String
+  entityType  String
+  entityId    String?
+  detailsJson String
+  createdAt   DateTime @default(now())
+  actor       User?    @relation(fields: [actorId], references: [id])
+}
