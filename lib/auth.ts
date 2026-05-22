@@ -52,7 +52,11 @@ export async function getCurrentUser() {
   const cookieStore = await cookies();
   const session = readSessionToken(cookieStore.get(COOKIE_NAME)?.value);
   if (!session) return null;
-  return findUserById(session.userId);
+  try {
+    return await findUserById(session.userId);
+  } catch {
+    return null;
+  }
 }
 
 export async function requireUser() {
