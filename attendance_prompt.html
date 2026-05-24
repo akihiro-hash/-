@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>勤怠管理アプリ作成用プロンプト</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --border: #e5e7eb;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    .container {
+      max-width: 980px;
+      margin: 32px auto;
+      padding: 0 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 6px 24px rgba(17, 24, 39, 0.05);
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: clamp(1.4rem, 2.8vw, 2rem);
+    }
+
+    .desc {
+      margin-top: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .prompt {
+      margin-top: 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #0b1020;
+      color: #dbeafe;
+      padding: 16px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.9rem;
+    }
+
+    .btn {
+      margin-top: 16px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    .btn:active { transform: translateY(1px); }
+
+    .copied {
+      margin-left: 10px;
+      color: #047857;
+      font-weight: 600;
+      font-size: 0.9rem;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="card">
+      <h1>勤怠管理アプリ作成用プロンプト</h1>
+      <p class="desc">以下をそのままAIに渡して、勤怠管理アプリの設計・実装を依頼してください。</p>
+
+      <pre id="prompt" class="prompt">あなたは、実務で使える勤怠管理Webアプリを設計・実装するプロのプロダクト開発者です。
+日本の労務実務を意識しつつ、スタッフが迷わず使えて、管理者が月末確認しやすい勤怠管理アプリを作成してください。
+
+【アプリの目的】
+- スタッフは社用スマホから簡単に出勤・退勤・勤怠修正・有給確認ができる
+- 管理者はPCから全スタッフの勤怠、有給、修正理由、残業、振休状況を一画面で確認できる
+- 月末確認がしやすく、あとから見返しても理由や履歴が分かるアプリにする
+
+【前提】
+- スタッフはスマホ利用が前提
+- 管理者はPC利用が前提
+- スタッフは自分の情報だけ閲覧・操作可能
+- 管理者は全スタッフの情報を閲覧・修正可能
+- 本人は当月のみ修正可能、翌月に入ったら本人修正は自動ロック
+- 過去月の修正は管理者のみ可能
+
+【必須機能：スタッフ側】
+1. ログイン
+- 各スタッフが自分のアカウントでログインできる
+- 他スタッフの情報は一切見えない
+
+2. 出勤・退勤
+- スマホで大きいボタンから簡単に打刻できる
+- 出勤ボタンは 8:00〜8:59 に押した場合、自動で 9:00 登録
+- 退勤ボタンは 17:30〜17:59 に押した場合、自動で 18:00 登録
+- 打刻後は「出勤を記録しました」「退勤を記録しました」など、押せたことが分かる表示を出す
+- 今日の打刻状況が分かるようにする
+
+3. 勤怠修正
+- 出勤・退勤ボタンの下に「勤怠修正」ボタンを置く
+- ボタンを押したときだけ入力欄が表示される
+- 日付、出勤、退勤、状態、理由を入力して修正できる
+
+4. 有給管理
+- 残有給を表示する
+- 残有給の横に「有給登録」ボタンを置く
+- ボタンを押したときだけ入力欄が表示される
+- 日付、時間有給／全日有給、時間数、理由を入力できる
+- 登録後は「有給追加しました！」など分かりやすい表示を出す
+- 残有給を押すと、有給使用履歴一覧が開く
+- 一覧には「いつ・何時間・理由」が見えるようにする
+- 未来日の有給は修正できるようにする
+
+5. アラート
+- 今日の勤怠未入力アラート
+- 出勤済みで退勤未入力アラート
+- 勤務予定日なのに入力がないアラート
+- 有給消滅の6か月前アラート
+- 土日祝に出勤したら、振休確認が必要であることを知らせるアラート
+
+6. 表示
+- スマホで見やすいことを最優先
+- 横スクロールをできるだけ避ける
+- 1か月の自分の勤務実績を縦に見やすく表示する
+- 「何月を見ているか」が常に分かるようにする
+- ログアウトボタンを分かりやすい位置に表示する
+
+【必須機能：管理者側】
+1. 管理者ダッシュボード
+- PC幅をしっかり使ったレイアウトにする
+- 画面全体を横広く使う
+- 一覧性を重視する
+
+2. 管理者が見たい情報
+- 全スタッフの月間勤怠
+- 有給残数
+- 有給失効アラート
+- 有給付与まであと何日か
+- 未入力件数
+- 退勤漏れ件数
+- 月末未確認人数
+- みなし残業20時間超過者
+- 振休未消化者
+
+3. 月末チェック表
+- 左にスタッフ名を縦に並べる
+- 名前の横に雇用区分（正社員／パート）を表示
+- 横に日付を1日〜月末まで並べる
+- 各セルには、通常勤務・有給・欠勤・遅刻・早退・振休・休日出勤などが分かるように表示
+- 通常勤務は「○」でもよい
+- 早退・遅刻・休日出勤・残業などは、内容や時間が分かる表示にする
+- 土日祝は色分けする
+- 欠勤、有給、遅刻、早退、振休、休日出勤は色セル化する
+- セルにカーソルを合わせたら、早退理由・欠勤理由・残業理由などが見えるようにする
+
+4. 月間サマリー
+- スタッフごとに以下を1行で見えるようにする
+- 出勤日数
+- 有給使用
+- 欠勤
+- 遅刻
+- 早退
+- 残業合計
+- みなし20時間
+- 超過時間
+- 休日出勤回数
+- 振休取得数
+- 振休残
+
+5. 勤怠修正
+- 管理者は全スタッフ分を編集できる
+- 修正理由を必ず残せるようにする
+- 誰がいつ直したかが分かる編集ログを残す
+
+6. 印刷
+- 管理者画面から1か月分の月末チェック表だけを印刷・PDF保存できるようにする
+- 印刷時には対象の月を明記する
+
+【残業管理】
+- 実残業時間を正しく記録する
+- みなし残業20時間は別管理にして、実残業とは分ける
+- 管理者画面では「今月残業」「みなし20h」「超過時間」を分かりやすく表示
+- 20時間超過者は目立つようにする
+- 18時を超える退勤を登録した場合は、残業理由入力を促す大きい入力窓を表示する
+- 閉じるボタンも付ける
+- 残業理由は管理者側でも確認できるようにする
+
+【休日出勤・振休】
+- 土日祝に出勤した場合は自動で休日出勤扱いにする
+- 手動で「休日出勤あり／なし」を選ばせない
+- 休日出勤したら、振休が未消化か分かるようにする
+- 管理者は誰が振休未消化か把握できるようにする
+
+【休憩ルール】
+- 法律を下回らないルールで自動計算する
+- 4時間以下：休憩0分
+- 4時間超6時間以下：休憩30分
+- 6時間超8時間以下：休憩45分
+- 8時間超：休憩60分
+
+【デザイン要件】
+- スタッフ側はスマホで見やすく、操作しやすく、文字も大きめにする
+- 管理者側はPCで見やすく、広いレイアウトにする
+- 無駄な説明文はなるべく削る
+- シンプルで分かりやすい画面にする
+- スタッフ側は「迷わないこと」が最優先
+- 管理者側は「一覧で把握しやすいこと」が最優先
+
+【データ管理】
+- スタッフごとのアカウントを持たせる
+- スタッフは自分のデータだけ
+- 管理者のみ全体を閲覧・修正可能
+- 勤怠、有給、編集ログ、月末確認情報を保存する
+- 将来的に本番運用できるように、認証とDB保存を前提にした設計にする
+
+【出力してほしいもの】
+- 画面構成案
+- 必要なデータ項目一覧
+- スタッフ画面のUI案
+- 管理者画面のUI案
+- 実装優先順位
+- 必要ならサンプルコード
+
+【重要】
+- ただ機能を並べるのではなく、実際の現場で使いやすい形にまとめること
+- スマホでの操作性と、管理者の月末確認のしやすさを特に重視すること
+- 曖昧な点は、実務で自然なほうを優先して提案すること</pre>
+
+      <button class="btn" id="copyBtn" type="button">プロンプトをコピー</button>
+      <span class="copied" id="copied">コピーしました</span>
+    </section>
+  </main>
+
+  <script>
+    const copyBtn = document.getElementById('copyBtn');
+    const copied = document.getElementById('copied');
+    const prompt = document.getElementById('prompt');
+
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(prompt.textContent);
+        copied.style.display = 'inline';
+        setTimeout(() => (copied.style.display = 'none'), 1800);
+      } catch (_) {
+        copied.textContent = 'コピーに失敗しました';
+        copied.style.display = 'inline';
+      }
+    });
+  </script>
+</body>
+</html>
