@@ -130,13 +130,23 @@ async function createDatabaseSchema() {
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "PaidLeaveRequest" ADD COLUMN IF NOT EXISTS "reviewerNote" TEXT`,
+    `ALTER TABLE "CorrectionRequest" ADD COLUMN IF NOT EXISTS "reviewerNote" TEXT`,
     `CREATE TABLE IF NOT EXISTS "PaidLeaveUsage" (
       "id" TEXT PRIMARY KEY,
-      "requestId" TEXT NOT NULL,
-      "grantId" TEXT NOT NULL,
+      "userId" TEXT,
+      "paidLeaveGrantId" TEXT,
+      "paidLeaveRequestId" TEXT,
+      "requestId" TEXT,
+      "grantId" TEXT,
       "usedMinutes" INTEGER NOT NULL,
+      "usedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "PaidLeaveUsage" ADD COLUMN IF NOT EXISTS "userId" TEXT`,
+    `ALTER TABLE "PaidLeaveUsage" ADD COLUMN IF NOT EXISTS "paidLeaveGrantId" TEXT`,
+    `ALTER TABLE "PaidLeaveUsage" ADD COLUMN IF NOT EXISTS "paidLeaveRequestId" TEXT`,
+    `ALTER TABLE "PaidLeaveUsage" ADD COLUMN IF NOT EXISTS "usedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
     `CREATE TABLE IF NOT EXISTS "AuditLog" (
       "id" TEXT PRIMARY KEY,
       "userId" TEXT NOT NULL,
