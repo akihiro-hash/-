@@ -78,6 +78,7 @@ async function createDatabaseSchema() {
     `CREATE TABLE IF NOT EXISTS "CorrectionRequest" (
       "id" TEXT PRIMARY KEY,
       "userId" TEXT NOT NULL,
+      "attendanceRecordId" TEXT,
       "targetDate" TIMESTAMP NOT NULL,
       "requestedClockInAt" TIMESTAMP,
       "requestedClockOutAt" TIMESTAMP,
@@ -88,6 +89,7 @@ async function createDatabaseSchema() {
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "CorrectionRequest" ADD COLUMN IF NOT EXISTS "attendanceRecordId" TEXT`,
     `CREATE TABLE IF NOT EXISTS "CorrectionLog" (
       "id" TEXT PRIMARY KEY,
       "userId" TEXT NOT NULL,
