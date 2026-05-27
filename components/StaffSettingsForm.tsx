@@ -62,15 +62,15 @@ export function StaffSettingsForm({ users, jobTitles }: Props) {
       </label>
       <label>
         週所定日数
-        <input name="weeklyWorkDays" type="number" min="1" max="7" step="1" defaultValue="5" required onChange={(event) => syncEndTime(event.currentTarget.form)} />
+        <input name="weeklyWorkDays" type="number" min="1" max="7" step="1" defaultValue="5" required onChange={(event) => event.currentTarget.form && syncEndTime(event.currentTarget.form)} />
       </label>
       <label>
         週所定時間
-        <input name="weeklyWorkHours" type="number" min="1" step="0.5" defaultValue="40" required onChange={(event) => syncEndTime(event.currentTarget.form)} />
+        <input name="weeklyWorkHours" type="number" min="1" step="0.5" defaultValue="40" required onChange={(event) => event.currentTarget.form && syncEndTime(event.currentTarget.form)} />
       </label>
       <label>
         標準出勤
-        <input name="standardStartTime" type="time" defaultValue="09:00" required onChange={(event) => syncEndTime(event.currentTarget.form)} />
+        <input name="standardStartTime" type="time" defaultValue="09:00" required onChange={(event) => event.currentTarget.form && syncEndTime(event.currentTarget.form)} />
       </label>
       <label>
         標準退勤
