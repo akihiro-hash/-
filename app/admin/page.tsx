@@ -1,5 +1,6 @@
 import { AdminDecisionButtons, PrintButton } from "@/components/AdminActions";
 import { AdminHelpModal } from "@/components/AdminHelpModal";
+import { StaffSettingsForm } from "@/components/StaffSettingsForm";
 import { requireAdmin } from "@/lib/auth";
 import { getMonthData, leaveSummary } from "@/lib/json-db";
 import { formatTime, minutesToHours, monthRange, toJstDateKey } from "@/lib/time";
@@ -451,45 +452,7 @@ export default async function AdminPage({ searchParams }: Props) {
       <section className="card no-print">
         <h2>スタッフ勤務設定</h2>
         <p className="muted">パートさんなど、週の所定労働日数・時間を適用開始日つきで設定します。有給の自動付与は付与日時点の設定で計算します。</p>
-        <form className="admin-actions" action="/api/admin/staff-settings" method="post">
-          <label>
-            スタッフ
-            <select name="userId" required>
-              {users.map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}
-            </select>
-          </label>
-          <label>
-            適用開始日
-            <input name="effectiveFrom" type="date" required />
-          </label>
-          <label>
-            部署
-            <input name="department" placeholder="例: 訪問看護" />
-          </label>
-          <label>
-            職種
-            <select name="jobTitle" defaultValue="その他">
-              {jobTitles.map((jobTitle) => <option value={jobTitle} key={jobTitle}>{jobTitle}</option>)}
-            </select>
-          </label>
-          <label>
-            週所定日数
-            <input name="weeklyWorkDays" type="number" min="1" max="7" step="1" defaultValue="5" required />
-          </label>
-          <label>
-            週所定時間
-            <input name="weeklyWorkHours" type="number" min="1" step="0.5" defaultValue="40" required />
-          </label>
-          <label>
-            標準出勤
-            <input name="standardStartTime" type="time" defaultValue="09:00" required />
-          </label>
-          <label>
-            標準退勤
-            <input name="standardEndTime" type="time" defaultValue="18:00" required />
-          </label>
-          <button className="primary">設定を保存</button>
-        </form>
+        <StaffSettingsForm users={users.map((user) => ({ id: user.id, name: user.name }))} jobTitles={jobTitles} />
       </section>
     </main>
   );
