@@ -3,7 +3,7 @@ import { setSession, verifyPassword } from "@/lib/auth";
 import { findLoginUserByEmail } from "@/lib/json-db";
 
 export async function GET(request: Request) {
-  const loginUrl = new URL("/login", request.url).toString();
+  const loginUrl = new URL("/staff-login", request.url).toString();
   return new Response(
     `<!doctype html>
 <html lang="ja">
@@ -26,10 +26,16 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const email = String(form.get("email") ?? "");
   const password = String(form.get("password") ?? "");
+  const expectedRole = String(form.get("expectedRole") ?? "") as "STAFF" | "ADMIN" | "";
   const user = await findLoginUserByEmail(email);
+  const retryPath = expectedRole === "ADMIN" ? "/admin-login" : expectedRole === "STAFF" ? "/staff-login" : "/login";
 
   if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
-    return NextResponse.redirect(new URL("/login?error=1", request.url), 303);
+    return NextResponse.redirect(new URL(`${retryPath}?error=1`, request.url), 303);
+  }
+
+  if ((expectedRole === "STAFF" || expectedRole === "ADMIN") && user.role !== expectedRole) {
+    return NextResponse.redirect(new URL(`${retryPath}?error=role`, request.url), 303);
   }
 
   await setSession(user.id, user.role as "STAFF" | "ADMIN");

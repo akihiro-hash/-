@@ -157,6 +157,7 @@ model PaidLeaveRequest {
   usages          PaidLeaveUsage[]
 
   @@index([startAt])
+  @@index([userId, startAt])
 }
 
 model PaidLeaveUsage {

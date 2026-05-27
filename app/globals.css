@@ -65,6 +65,17 @@ a {
   gap: 24px;
 }
 
+.login-choice {
+  display: grid;
+  gap: 10px;
+}
+
+.login-switch {
+  text-align: center;
+  font-weight: 800;
+  color: var(--primary);
+}
+
 .eyebrow {
   margin: 0 0 8px;
   color: var(--primary);
