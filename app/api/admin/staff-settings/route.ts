@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     details: {
       effectiveFrom: String(form.get("effectiveFrom") ?? ""),
       employmentStatus: String(form.get("employmentStatus") ?? "ACTIVE"),
+      employmentType: String(form.get("employmentType") || "正社員"),
       workingWeekdays: normalizeWorkingWeekdays(form.getAll("workingWeekdays"))
     }
   });

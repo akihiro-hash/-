@@ -52,7 +52,8 @@ const jobTitles = ["看護師", "理学療法士", "作業療法士", "言語聴
 const savedMessages: Record<string, string> = {
   "staff-added": "スタッフを追加しました。",
   "staff-settings": "スタッフ勤務設定を保存しました。",
-  "month-closed": "月末締めを完了しました。"
+  "month-closed": "月末締めを完了しました。",
+  "password-reset": "仮パスワード password123 にリセットしました。本人に伝えて、ログイン後に変更してもらってください。"
 };
 
 type LeaveRequestLike = {
@@ -566,6 +567,16 @@ export default async function AdminPage({ searchParams }: Props) {
                 </select>
               </label>
               <label>
+                雇用形態
+                <select name="employmentType" defaultValue="正社員">
+                  <option value="正社員">正社員</option>
+                  <option value="パート">パート</option>
+                  <option value="時短">時短</option>
+                  <option value="非常勤">非常勤</option>
+                  <option value="その他">その他</option>
+                </select>
+              </label>
+              <label>
                 部署
                 <input name="department" defaultValue="訪問看護" required />
               </label>
@@ -608,6 +619,22 @@ export default async function AdminPage({ searchParams }: Props) {
           <div className="accordion-body">
             <p className="muted">パートさんなど、週の所定労働日数・時間を適用開始日つきで設定します。有給の自動付与は付与日時点の設定で計算します。</p>
             <StaffSettingsForm users={users.map((user) => ({ id: user.id, name: user.name }))} jobTitles={jobTitles} />
+          </div>
+        </details>
+
+        <details className="accordion-card">
+          <summary className="accordion-summary">パスワード緊急リセット</summary>
+          <div className="accordion-body">
+            <p className="muted">本人がパスワードを忘れた場合に、仮パスワード password123 に戻します。ログイン後、本人にパスワード変更してもらってください。</p>
+            <form className="admin-actions" action="/api/admin/password-reset" method="post">
+              <label>
+                スタッフ
+                <select name="userId" required>
+                  {users.map((user) => <option value={user.id} key={user.id}>{user.name}</option>)}
+                </select>
+              </label>
+              <button className="danger">仮パスワードに戻す</button>
+            </form>
           </div>
         </details>
       </section>

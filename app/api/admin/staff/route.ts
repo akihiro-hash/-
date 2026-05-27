@@ -6,6 +6,7 @@ export async function POST(request: Request) {
   const admin = await requireAdmin();
   const form = await request.formData();
   const workingWeekdays = normalizeWorkingWeekdays(form.getAll("workingWeekdays"));
+  const employmentType = String(form.get("employmentType") || "正社員");
   try {
     const user = await createStaff({
       name: String(form.get("name") ?? ""),
@@ -21,14 +22,14 @@ export async function POST(request: Request) {
       action: "STAFF_CREATE",
       entityType: "USER",
       entityId: user.id,
-      details: { name: user.name, jobTitle: user.jobTitle, effectiveFrom: user.hireDate, workingWeekdays }
+      details: { name: user.name, jobTitle: user.jobTitle, effectiveFrom: user.hireDate, employmentType, workingWeekdays }
     });
     await createAuditLog({
       actorId: admin.id,
       action: "STAFF_SETTINGS_UPDATE",
       entityType: "USER",
       entityId: user.id,
-      details: { effectiveFrom: user.hireDate, employmentStatus: "ACTIVE", workingWeekdays }
+      details: { effectiveFrom: user.hireDate, employmentStatus: "ACTIVE", employmentType, workingWeekdays }
     });
     return NextResponse.redirect(new URL("/admin?saved=staff-added", request.url), 303);
   } catch (error) {

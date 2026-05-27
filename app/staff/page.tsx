@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ActionButton } from "@/components/ActionButton";
 import { StaffQuickNav } from "@/components/StaffQuickNav";
 import { DailyOperationsForm } from "@/components/StaffForms";
+import { PasswordChangeForm } from "@/components/PasswordChangeForm";
 import { requireUser } from "@/lib/auth";
 import { findAttendanceRecord, getStandardWorkForDate, getUserMonthAttendanceRecords, getWorkingWeekdaySettings, isScheduledWorkday } from "@/lib/json-db";
 import { getJpHolidayName } from "@/lib/jp-holidays";
@@ -95,6 +96,10 @@ export default async function StaffPage() {
           <a className="secondary" href="/staff/correction">出退勤の修正</a>
           <a className="secondary" href="/staff/month">今月の勤怠</a>
         </div>
+      </section>
+      <section className="card stack">
+        <h2>アカウント</h2>
+        <PasswordChangeForm />
       </section>
       <StaffQuickNav />
     </main>

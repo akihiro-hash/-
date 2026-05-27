@@ -91,6 +91,16 @@ export function StaffSettingsForm({ users, jobTitles }: Props) {
           <option value="INACTIVE">休職・退職</option>
         </select>
       </label>
+      <label>
+        雇用形態
+        <select name="employmentType" defaultValue="正社員">
+          <option value="正社員">正社員</option>
+          <option value="パート">パート</option>
+          <option value="時短">時短</option>
+          <option value="非常勤">非常勤</option>
+          <option value="その他">その他</option>
+        </select>
+      </label>
       <fieldset className="weekday-picker">
         <legend>勤務曜日</legend>
         {[

@@ -112,6 +112,11 @@ export type WorkingWeekdaySetting = {
   weekdays: number[];
 };
 
+export type StaffProfileSetting = {
+  employmentType: string;
+  workingWeekdays: number[];
+};
+
 type DbSnapshot = {
   users: User[];
   attendanceRecords: AttendanceRecord[];
@@ -264,7 +269,7 @@ async function createDatabaseSchema() {
   }
 }
 
-function hashPassword(password: string) {
+export function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const hash = pbkdf2Sync(password, salt, 120000, 64, "sha512").toString("hex");
   return `pbkdf2$${salt}$${hash}`;
@@ -644,6 +649,39 @@ export async function getWorkingWeekdaySettings(userIds: string[]) {
     settings.set(log.entityId, [...(settings.get(log.entityId) ?? []), { effectiveFrom, weekdays }]);
   }
   return settings;
+}
+
+export async function getStaffProfileSettings(userIds: string[]) {
+  if (userIds.length === 0) return new Map<string, StaffProfileSetting>();
+  const logs = await prisma.auditLog.findMany({
+    where: {
+      action: { in: ["STAFF_CREATE", "STAFF_SETTINGS_UPDATE"] },
+      entityType: "USER",
+      entityId: { in: userIds }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+  const settings = new Map<string, StaffProfileSetting>();
+  for (const log of logs) {
+    if (!log.entityId || settings.has(log.entityId)) continue;
+    const details = parseAuditDetails(log.detailsJson);
+    const employmentType = typeof details.employmentType === "string" ? details.employmentType : "正社員";
+    const workingWeekdays = Array.isArray(details.workingWeekdays) ? normalizeWorkingWeekdays(details.workingWeekdays) : [];
+    settings.set(log.entityId, { employmentType, workingWeekdays });
+  }
+  return settings;
+}
+
+export async function findUserPasswordHash(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
+  return user?.passwordHash ?? null;
+}
+
+export async function updateUserPassword(userId: string, password: string) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash: hashPassword(password) }
+  });
 }
 
 export async function isMonthClosed(month: string) {
