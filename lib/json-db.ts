@@ -432,7 +432,7 @@ export async function getRecentLeaveRequests(userId: string, take = 8) {
   await ensureInitialData();
   const requests = await prisma.paidLeaveRequest.findMany({
     where: { userId },
-    orderBy: { createdAt: "desc" },
+    orderBy: { startAt: "desc" },
     take
   });
   return requests.map(serializeLeaveRequest);
