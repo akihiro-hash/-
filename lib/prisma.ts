@@ -64,17 +64,21 @@ async function createDatabaseSchema() {
       "status" TEXT NOT NULL DEFAULT 'PENDING',
       "onCall" BOOLEAN NOT NULL DEFAULT false,
       "emergencyVisits" INTEGER NOT NULL DEFAULT 0,
+      "note" TEXT,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "AttendanceRecord" ADD COLUMN IF NOT EXISTS "note" TEXT`,
     `CREATE UNIQUE INDEX IF NOT EXISTS "AttendanceRecord_userId_workDate_key" ON "AttendanceRecord" ("userId", "workDate")`,
     `CREATE TABLE IF NOT EXISTS "BreakRecord" (
       "id" TEXT PRIMARY KEY,
       "attendanceRecordId" TEXT NOT NULL,
-      "breakStartAt" TIMESTAMP NOT NULL,
-      "breakEndAt" TIMESTAMP,
+      "startAt" TIMESTAMP,
+      "endAt" TIMESTAMP,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "BreakRecord" ADD COLUMN IF NOT EXISTS "startAt" TIMESTAMP`,
+    `ALTER TABLE "BreakRecord" ADD COLUMN IF NOT EXISTS "endAt" TIMESTAMP`,
     `CREATE TABLE IF NOT EXISTS "CorrectionRequest" (
       "id" TEXT PRIMARY KEY,
       "userId" TEXT NOT NULL,
@@ -151,13 +155,17 @@ async function createDatabaseSchema() {
     `ALTER TABLE "PaidLeaveUsage" ADD COLUMN IF NOT EXISTS "usedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
     `CREATE TABLE IF NOT EXISTS "AuditLog" (
       "id" TEXT PRIMARY KEY,
-      "userId" TEXT NOT NULL,
+      "actorId" TEXT,
       "action" TEXT NOT NULL,
-      "targetType" TEXT NOT NULL,
-      "targetId" TEXT NOT NULL,
-      "payload" JSONB NOT NULL,
+      "entityType" TEXT NOT NULL DEFAULT '',
+      "entityId" TEXT,
+      "detailsJson" TEXT NOT NULL DEFAULT '{}',
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`
+    )`,
+    `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "actorId" TEXT`,
+    `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "entityType" TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "entityId" TEXT`,
+    `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "detailsJson" TEXT NOT NULL DEFAULT '{}'`
   ];
 
   for (const statement of statements) {
