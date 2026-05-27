@@ -51,7 +51,8 @@ const jobTitles = ["看護師", "理学療法士", "作業療法士", "言語聴
 
 const savedMessages: Record<string, string> = {
   "staff-added": "スタッフを追加しました。",
-  "staff-settings": "スタッフ勤務設定を保存しました。"
+  "staff-settings": "スタッフ勤務設定を保存しました。",
+  "month-closed": "月末締めを完了しました。"
 };
 
 type LeaveRequestLike = {
@@ -76,10 +77,11 @@ export default async function AdminPage({ searchParams }: Props) {
   const params = await searchParams;
   const month = params.month ?? toJstDateKey().slice(0, 7);
   const { days } = monthRange(month);
-  const { users, records, leaves, correctionRequests, leaveRequests, correctionLogs, leaveRequestHistory, paidLeaveGrants } = await getMonthData(month);
+  const { users, records, leaves, correctionRequests, leaveRequests, correctionLogs, leaveRequestHistory, paidLeaveGrants, auditLogs, monthClosed } = await getMonthData(month);
   const expiringSummaries = await Promise.all(users.map(async (user) => ({ user, summary: await leaveSummary(user.id) })));
   const userName = new Map(users.map((user) => [user.id, user.name]));
   const recordMap = new Map(records.map((record) => [`${record.userId}:${record.workDate}`, record]));
+  const todayKey = toJstDateKey();
   const overtimeByUser = new Map<string, number>();
   for (const record of records) {
     overtimeByUser.set(record.userId, (overtimeByUser.get(record.userId) ?? 0) + record.overtimeMins);
@@ -90,6 +92,25 @@ export default async function AdminPage({ searchParams }: Props) {
     const key = `${leave.userId}:${leave.startAt.slice(0, 10)}`;
     leaveMap.set(key, [...(leaveMap.get(key) ?? []), leave]);
   }
+  const missingAlerts = users.flatMap((user) =>
+    Array.from({ length: days }, (_, index) => {
+      const dateKey = `${month}-${String(index + 1).padStart(2, "0")}`;
+      if (dateKey >= todayKey) return null;
+      const weekday = new Date(`${dateKey}T00:00:00+09:00`).getDay();
+      if (weekday === 0 || weekday === 6 || getJpHolidayName(dateKey)) return null;
+      const record = recordMap.get(`${user.id}:${dateKey}`);
+      if (!record) return { user, dateKey, message: "勤怠未登録" };
+      if (record.clockInAt && !record.clockOutAt) return { user, dateKey, message: "退勤漏れ" };
+      return null;
+    }).filter((item): item is { user: typeof user; dateKey: string; message: string } => !!item)
+  );
+  const holidayWorkCandidates = records
+    .filter((record) => {
+      if (!record.clockInAt) return false;
+      const weekday = new Date(`${record.workDate}T00:00:00+09:00`).getDay();
+      return weekday === 0 || weekday === 6 || !!getJpHolidayName(record.workDate);
+    })
+    .map((record) => ({ record, user: users.find((user) => user.id === record.userId), holiday: getJpHolidayName(record.workDate) }));
 
   return (
     <main className="admin-shell">
@@ -117,6 +138,21 @@ export default async function AdminPage({ searchParams }: Props) {
         </form>
       </section>
 
+      <section className="card no-print">
+        <div className="section-heading">
+          <div>
+            <h2>月末締め</h2>
+            <p className="muted">{monthClosed ? `${month} は締め済みです。スタッフ側からの修正・申請は止まります。` : "確認が終わった月は締めると、スタッフ側からの後追い修正を防げます。"}</p>
+          </div>
+          {!monthClosed && (
+            <form action="/api/admin/month-close" method="post">
+              <input type="hidden" name="month" value={month} />
+              <button className="danger">この月を締める</button>
+            </form>
+          )}
+        </div>
+      </section>
+
       {params.saved && savedMessages[params.saved] && (
         <section className="card success-note no-print">
           {savedMessages[params.saved]}
@@ -127,6 +163,36 @@ export default async function AdminPage({ searchParams }: Props) {
         <section className="card alert no-print">
           <h2>未承認があります</h2>
           <p>休み申請 {leaveRequests.length}件 / 勤怠修正 {correctionRequests.length}件 が承認待ちです。</p>
+        </section>
+      )}
+
+      {missingAlerts.length > 0 && (
+        <section className="card alert no-print">
+          <h2>未打刻・退勤漏れアラート</h2>
+          <p>{missingAlerts.length}件あります。必要に応じてスタッフへ確認してください。</p>
+          <div className="day-list compact-list">
+            {missingAlerts.slice(0, 12).map((item) => (
+              <div className="day-item" key={`${item.user.id}:${item.dateKey}`}>
+                <strong>{item.user.name}</strong>
+                <span>{item.dateKey} / {item.message}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {holidayWorkCandidates.length > 0 && (
+        <section className="card alert no-print">
+          <h2>休日出勤候補</h2>
+          <p>土日祝の出勤が {holidayWorkCandidates.length}件あります。代休付与が必要か確認してください。</p>
+          <div className="day-list compact-list">
+            {holidayWorkCandidates.slice(0, 12).map(({ record, user, holiday }) => (
+              <div className="day-item" key={record.id}>
+                <strong>{user?.name ?? "スタッフ"}</strong>
+                <span>{record.workDate} {holiday ? `/ ${holiday}` : "/ 土日"} / 出勤 {formatTime(record.clockInAt ? new Date(record.clockInAt) : null)}</span>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 
@@ -356,6 +422,25 @@ export default async function AdminPage({ searchParams }: Props) {
           ))}
           {correctionLogs.length === 0 && <p className="muted">今月の修正ログはありません。</p>}
         </div>
+        </div>
+      </details>
+
+      <details className="card accordion-card no-print">
+        <summary className="accordion-summary">監査ログ</summary>
+        <div className="accordion-body">
+          <div className="request-list">
+            {auditLogs.map((log) => (
+              <div className="request-item" key={log.id}>
+                <div>
+                  <strong>{log.action} / {log.entityType}</strong>
+                  <p className="muted">
+                    {formatTime(log.createdAt ? new Date(log.createdAt) : null)} / 操作者 {log.actorId ? userName.get(log.actorId) ?? "管理者" : "システム"} / 対象 {log.entityId ?? "-"}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {auditLogs.length === 0 && <p className="muted">監査ログはまだありません。</p>}
+          </div>
         </div>
       </details>
 

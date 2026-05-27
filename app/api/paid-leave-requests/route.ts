@@ -18,15 +18,19 @@ export async function POST(request: Request) {
       ? Math.max(1, Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1)
       : 1;
 
-  const created = await createLeaveRequest({
-    userId: user.id,
-    leaveType,
-    unit,
-    halfDayPeriod: halfDayPeriod === "PM" ? "PM" : halfDayPeriod === "AM" ? "AM" : null,
-    startAt: `${startDate}T00:00:00+09:00`,
-    endAt: `${endDate}T23:59:59+09:00`,
-    requestedMinutes: requestedLeaveMinutes(unit, hours) * days,
-    reason
-  });
-  return NextResponse.json(created);
+  try {
+    const created = await createLeaveRequest({
+      userId: user.id,
+      leaveType,
+      unit,
+      halfDayPeriod: halfDayPeriod === "PM" ? "PM" : halfDayPeriod === "AM" ? "AM" : null,
+      startAt: `${startDate}T00:00:00+09:00`,
+      endAt: `${endDate}T23:59:59+09:00`,
+      requestedMinutes: requestedLeaveMinutes(unit, hours) * days,
+      reason
+    });
+    return NextResponse.json(created);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "申請できませんでした。" }, { status: 400 });
+  }
 }

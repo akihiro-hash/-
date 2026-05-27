@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
-import { updateStaffSettings } from "@/lib/json-db";
+import { createAuditLog, updateStaffSettings } from "@/lib/json-db";
 
 export async function POST(request: Request) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const form = await request.formData();
+  const userId = String(form.get("userId") ?? "");
   await updateStaffSettings({
     userId: String(form.get("userId") ?? ""),
     effectiveFrom: String(form.get("effectiveFrom") ?? ""),
@@ -13,7 +14,15 @@ export async function POST(request: Request) {
     standardStartTime: String(form.get("standardStartTime") ?? "09:00"),
     standardEndTime: String(form.get("standardEndTime") ?? "18:00"),
     department: String(form.get("department") ?? ""),
-    jobTitle: String(form.get("jobTitle") ?? "その他")
+    jobTitle: String(form.get("jobTitle") ?? "その他"),
+    employmentStatus: String(form.get("employmentStatus") ?? "ACTIVE") === "INACTIVE" ? "INACTIVE" : "ACTIVE"
+  });
+  await createAuditLog({
+    actorId: admin.id,
+    action: "STAFF_SETTINGS_UPDATE",
+    entityType: "USER",
+    entityId: userId,
+    details: { effectiveFrom: String(form.get("effectiveFrom") ?? ""), employmentStatus: String(form.get("employmentStatus") ?? "ACTIVE") }
   });
   return NextResponse.redirect(new URL("/admin?saved=staff-settings", request.url), 303);
 }

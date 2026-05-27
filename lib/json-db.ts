@@ -97,6 +97,16 @@ export type CorrectionRequest = {
   reviewedAt?: string | null;
 };
 
+export type AuditLog = {
+  id: string;
+  actorId?: string | null;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  detailsJson: string;
+  createdAt: string;
+};
+
 type DbSnapshot = {
   users: User[];
   attendanceRecords: AttendanceRecord[];
@@ -382,6 +392,18 @@ function serializeCorrectionLog(log: any): CorrectionLog {
   };
 }
 
+function serializeAuditLog(log: any): AuditLog {
+  return {
+    id: log.id,
+    actorId: log.actorId,
+    action: log.action,
+    entityType: log.entityType,
+    entityId: log.entityId,
+    detailsJson: log.detailsJson ?? "{}",
+    createdAt: iso(log.createdAt) ?? ""
+  };
+}
+
 async function ensureInitialData() {
   initialDataReady ??= ensureInitialDataOnce();
   return initialDataReady;
@@ -502,9 +524,11 @@ export async function updateStaffSettings(input: {
   standardEndTime: string;
   department: string;
   jobTitle: string;
+  employmentStatus?: "ACTIVE" | "INACTIVE";
 }) {
   const user = await prisma.user.findUnique({ where: { id: input.userId } });
   if (!user) return null;
+  const employmentStatus = input.employmentStatus === "INACTIVE" ? "INACTIVE" : "ACTIVE";
   const setting = await prisma.workSetting.create({
     data: {
       userId: input.userId,
@@ -524,11 +548,62 @@ export async function updateStaffSettings(input: {
         weeklyWorkDays: setting.weeklyWorkDays,
         weeklyWorkHours: setting.weeklyWorkHours,
         department: setting.department,
-        jobTitle: setting.jobTitle
+        jobTitle: setting.jobTitle,
+        employmentStatus
       }
+    });
+  } else {
+    await prisma.user.update({
+      where: { id: input.userId },
+      data: { employmentStatus }
     });
   }
   return findUserById(input.userId);
+}
+
+export async function createAuditLog(input: {
+  actorId?: string | null;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  details?: unknown;
+}) {
+  return prisma.auditLog.create({
+    data: {
+      actorId: input.actorId ?? null,
+      action: input.action,
+      entityType: input.entityType,
+      entityId: input.entityId ?? null,
+      detailsJson: JSON.stringify(input.details ?? {})
+    }
+  });
+}
+
+export async function getRecentAuditLogs(take = 30) {
+  const logs = await prisma.auditLog.findMany({
+    orderBy: { createdAt: "desc" },
+    take
+  });
+  return logs.map(serializeAuditLog);
+}
+
+export async function isMonthClosed(month: string) {
+  const closeLog = await prisma.auditLog.findFirst({
+    where: { action: "MONTH_CLOSE", entityType: "ATTENDANCE_MONTH", entityId: month },
+    orderBy: { createdAt: "desc" }
+  });
+  return !!closeLog;
+}
+
+export async function closeAttendanceMonth(month: string, actorId: string) {
+  if (await isMonthClosed(month)) return null;
+  return createAuditLog({
+    actorId,
+    action: "MONTH_CLOSE",
+    entityType: "ATTENDANCE_MONTH",
+    entityId: month,
+    details: { month }
+  });
 }
 
 export async function createStaff(input: {
@@ -667,6 +742,9 @@ export async function saveAttendanceCorrection(input: {
   if (input.actorRole === "STAFF" && !canStaffEditDate(input.targetDate)) {
     throw new Error("翌月以降はスタッフ側で修正できません。管理者に依頼してください。");
   }
+  if (input.actorRole === "STAFF" && await isMonthClosed(input.targetDate.slice(0, 7))) {
+    throw new Error("この月は月末締め済みです。管理者に依頼してください。");
+  }
   const workDate = parseJstDate(input.targetDate);
   const record = await prisma.attendanceRecord.upsert({
     where: { userId_workDate: { userId: input.userId, workDate } },
@@ -693,6 +771,21 @@ export async function saveAttendanceCorrection(input: {
       afterClockInAt,
       afterClockOutAt,
       reason: input.reason || "理由なし"
+    }
+  });
+  await createAuditLog({
+    actorId: input.actorId,
+    action: "ATTENDANCE_CORRECTION",
+    entityType: "ATTENDANCE_RECORD",
+    entityId: record.id,
+    details: {
+      userId: input.userId,
+      targetDate: input.targetDate,
+      actorRole: input.actorRole,
+      beforeClockInAt: iso(beforeClockInAt),
+      beforeClockOutAt: iso(beforeClockOutAt),
+      afterClockInAt: iso(afterClockInAt),
+      afterClockOutAt: iso(afterClockOutAt)
     }
   });
   return serializeRecord(updated);
@@ -942,7 +1035,7 @@ function monthBounds(month: string) {
 export async function getMonthData(month: string) {
   await ensureInitialData();
   const { start, next } = monthBounds(month);
-  const [users, records, leaves, correctionRequests, leaveRequests, correctionLogs, leaveRequestHistory, paidLeaveGrants] = await Promise.all([
+  const [users, records, leaves, correctionRequests, leaveRequests, correctionLogs, leaveRequestHistory, paidLeaveGrants, auditLogs, monthClosed] = await Promise.all([
     prisma.user.findMany({ where: { role: "STAFF", employmentStatus: "ACTIVE" }, include: { workSettings: true } }),
     prisma.attendanceRecord.findMany({ where: { workDate: { gte: start, lt: next } } }),
     prisma.paidLeaveRequest.findMany({ where: { startAt: { gte: start, lt: next } } }),
@@ -950,7 +1043,9 @@ export async function getMonthData(month: string) {
     prisma.paidLeaveRequest.findMany({ where: { status: "PENDING" } }),
     prisma.correctionLog.findMany({ where: { targetDate: { gte: start, lt: next } } }),
     prisma.paidLeaveRequest.findMany({ where: { startAt: { gte: start, lt: next } } }),
-    prisma.paidLeaveGrant.findMany()
+    prisma.paidLeaveGrant.findMany(),
+    getRecentAuditLogs(40),
+    isMonthClosed(month)
   ]);
   return {
     users: users.map(serializeUser),
@@ -960,11 +1055,16 @@ export async function getMonthData(month: string) {
     leaveRequests: leaveRequests.map(serializeLeaveRequest),
     correctionLogs: correctionLogs.map(serializeCorrectionLog),
     leaveRequestHistory: leaveRequestHistory.map(serializeLeaveRequest),
-    paidLeaveGrants: paidLeaveGrants.map(serializeGrant)
+    paidLeaveGrants: paidLeaveGrants.map(serializeGrant),
+    auditLogs,
+    monthClosed
   };
 }
 
 export async function createLeaveRequest(input: Omit<PaidLeaveRequest, "id" | "status">) {
+  if (await isMonthClosed(input.startAt.slice(0, 7))) {
+    throw new Error("この月は月末締め済みです。管理者に依頼してください。");
+  }
   const request = await prisma.paidLeaveRequest.create({
     data: {
       userId: input.userId,
@@ -977,6 +1077,13 @@ export async function createLeaveRequest(input: Omit<PaidLeaveRequest, "id" | "s
       reason: input.reason,
       status: "PENDING"
     }
+  });
+  await createAuditLog({
+    actorId: input.userId,
+    action: "LEAVE_REQUEST_CREATE",
+    entityType: "PAID_LEAVE_REQUEST",
+    entityId: request.id,
+    details: { leaveType: input.leaveType, unit: input.unit, startAt: input.startAt, endAt: input.endAt }
   });
   return serializeLeaveRequest(request);
 }
@@ -1001,6 +1108,13 @@ export async function decideLeaveRequest(id: string, adminId: string, status: "A
     data: { status, approverId: adminId, reviewedAt: new Date() }
   });
   await recalculateLeaveGrantBalances(request.userId);
+  await createAuditLog({
+    actorId: adminId,
+    action: status === "APPROVED" ? "LEAVE_REQUEST_APPROVE" : "LEAVE_REQUEST_REJECT",
+    entityType: "PAID_LEAVE_REQUEST",
+    entityId: id,
+    details: { userId: request.userId, status }
+  });
   return serializeLeaveRequest(request);
 }
 
@@ -1020,5 +1134,12 @@ export async function decideCorrectionRequest(id: string, adminId: string, statu
       reason: request.reason
     });
   }
+  await createAuditLog({
+    actorId: adminId,
+    action: status === "APPROVED" ? "CORRECTION_REQUEST_APPROVE" : "CORRECTION_REQUEST_REJECT",
+    entityType: "CORRECTION_REQUEST",
+    entityId: id,
+    details: { userId: request.userId, targetDate: dateKey(request.targetDate), status }
+  });
   return serializeCorrectionRequest(request);
 }

@@ -316,6 +316,10 @@ textarea {
   gap: 10px;
 }
 
+.compact-list {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
 .day-item {
   display: grid;
   gap: 4px;

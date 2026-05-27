@@ -3,7 +3,8 @@ import { ActionButton } from "@/components/ActionButton";
 import { StaffQuickNav } from "@/components/StaffQuickNav";
 import { DailyOperationsForm } from "@/components/StaffForms";
 import { requireUser } from "@/lib/auth";
-import { findAttendanceRecord, getStandardWorkForDate } from "@/lib/json-db";
+import { findAttendanceRecord, getStandardWorkForDate, getUserMonthAttendanceRecords } from "@/lib/json-db";
+import { getJpHolidayName } from "@/lib/jp-holidays";
 import { addDays, formatTime, minutesToHours, toJstDateKey } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -13,12 +14,24 @@ export default async function StaffPage() {
   if (user.role === "ADMIN") redirect("/admin");
 
   const todayKey = toJstDateKey();
+  const month = todayKey.slice(0, 7);
   const yesterdayKey = toJstDateKey(addDays(new Date(), -1));
-  const [today, yesterday, todayStandardWork] = await Promise.all([
+  const [today, yesterday, todayStandardWork, monthRecords] = await Promise.all([
     findAttendanceRecord(user.id, todayKey),
     findAttendanceRecord(user.id, yesterdayKey),
-    getStandardWorkForDate(user.id, todayKey)
+    getStandardWorkForDate(user.id, todayKey),
+    getUserMonthAttendanceRecords(user.id, month)
   ]);
+  const recordMap = new Map(monthRecords.map((record) => [record.workDate, record]));
+  const staffAlerts = Array.from({ length: Number(todayKey.slice(8, 10)) - 1 }, (_, index) => {
+    const dateKey = `${month}-${String(index + 1).padStart(2, "0")}`;
+    const weekday = new Date(`${dateKey}T00:00:00+09:00`).getDay();
+    if (weekday === 0 || weekday === 6 || getJpHolidayName(dateKey)) return null;
+    const record = recordMap.get(dateKey);
+    if (!record) return `${dateKey} の勤怠が未登録です。`;
+    if (record.clockInAt && !record.clockOutAt) return `${dateKey} の退勤が未登録です。`;
+    return null;
+  }).filter((message): message is string => !!message);
 
   return (
     <main className="staff-shell">
@@ -32,6 +45,17 @@ export default async function StaffPage() {
           <button className="secondary">ログアウト</button>
         </form>
       </header>
+
+      {staffAlerts.length > 0 && (
+        <section className="card alert">
+          <h2>確認が必要な勤怠があります</h2>
+          <div className="day-list compact-list">
+            {staffAlerts.slice(0, 5).map((message) => (
+              <div className="day-item" key={message}>{message}</div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="card stack" id="staff-today">
         <h2>今日の打刻</h2>

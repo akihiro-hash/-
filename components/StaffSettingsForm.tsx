@@ -77,6 +77,13 @@ export function StaffSettingsForm({ users, jobTitles }: Props) {
         </select>
       </label>
       <label>
+        在籍状態
+        <select name="employmentStatus" defaultValue="ACTIVE">
+          <option value="ACTIVE">在籍中</option>
+          <option value="INACTIVE">休職・退職</option>
+        </select>
+      </label>
+      <label>
         週所定日数
         <input name="weeklyWorkDays" type="number" min="1" max="7" step="1" defaultValue="5" required onChange={(event) => event.currentTarget.form && syncEndTime(event.currentTarget.form)} />
       </label>
