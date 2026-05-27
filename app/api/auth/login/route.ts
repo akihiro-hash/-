@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { setSession, verifyPassword } from "@/lib/auth";
-import { findUserByEmail } from "@/lib/json-db";
+import { findLoginUserByEmail } from "@/lib/json-db";
 
 export async function GET(request: Request) {
   const loginUrl = new URL("/login", request.url).toString();
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const email = String(form.get("email") ?? "");
   const password = String(form.get("password") ?? "");
-  const user = await findUserByEmail(email);
+  const user = await findLoginUserByEmail(email);
 
   if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
     return NextResponse.redirect(new URL("/login?error=1", request.url), 303);

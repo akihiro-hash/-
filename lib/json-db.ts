@@ -108,6 +108,8 @@ type DbSnapshot = {
 };
 
 let schemaReady: Promise<void> | null = null;
+let dailyLeaveMaintenanceKey: string | null = null;
+let initialDataReady: Promise<void> | null = null;
 
 async function ensureDatabaseSchema() {
   schemaReady ??= createDatabaseSchema();
@@ -364,6 +366,11 @@ function serializeCorrectionLog(log: any): CorrectionLog {
 }
 
 async function ensureInitialData() {
+  initialDataReady ??= ensureInitialDataOnce();
+  return initialDataReady;
+}
+
+async function ensureInitialDataOnce() {
   await ensureDatabaseSchema();
   const count = await prisma.user.count();
   if (count > 0) return;
@@ -397,8 +404,7 @@ async function ensureInitialData() {
 
 export async function readDb(): Promise<DbSnapshot> {
   await ensureInitialData();
-  await ensureAutoAnnualPaidLeaveGrants();
-  await recalculateLeaveGrantBalances();
+  await runDailyLeaveMaintenance();
   const [users, attendanceRecords, paidLeaveGrants, paidLeaveRequests, correctionRequests, correctionLogs] = await Promise.all([
     prisma.user.findMany({ include: { workSettings: true } }),
     prisma.attendanceRecord.findMany(),
@@ -419,7 +425,6 @@ export async function readDb(): Promise<DbSnapshot> {
 }
 
 export async function getUserMonthAttendanceRecords(userId: string, month: string) {
-  await ensureInitialData();
   const { start, next } = monthBounds(month);
   const records = await prisma.attendanceRecord.findMany({
     where: { userId, workDate: { gte: start, lt: next } },
@@ -429,7 +434,6 @@ export async function getUserMonthAttendanceRecords(userId: string, month: strin
 }
 
 export async function getRecentLeaveRequests(userId: string, take = 8) {
-  await ensureInitialData();
   const requests = await prisma.paidLeaveRequest.findMany({
     where: { userId },
     orderBy: { startAt: "desc" },
@@ -444,8 +448,17 @@ export async function findUserByEmail(email: string) {
   return user ? serializeUser(user) : null;
 }
 
+export async function findLoginUserByEmail(email: string) {
+  const users = await prisma.$queryRaw<Array<{ id: string; role: string; passwordHash: string }>>`
+    SELECT "id", "role", "passwordHash"
+    FROM "User"
+    WHERE "email" = ${email}
+    LIMIT 1
+  `;
+  return users[0] ?? null;
+}
+
 export async function findUserById(id: string) {
-  await ensureInitialData();
   const user = await prisma.user.findUnique({ where: { id }, include: { workSettings: true } });
   return user ? serializeUser(user) : null;
 }
@@ -676,9 +689,11 @@ export async function updateDailyOperations(input: {
   return serializeRecord(record);
 }
 
-export async function leaveSummary(userId: string) {
-  await ensureAutoAnnualPaidLeaveGrants();
-  await recalculateLeaveGrantBalances();
+export async function leaveSummary(userId: string, options: { refresh?: boolean } = {}) {
+  if (options.refresh) {
+    await ensureAutoAnnualPaidLeaveGrants(userId);
+    await recalculateLeaveGrantBalances(userId);
+  }
   const today = parseJstDate(toJstDateKey());
   const grants = await prisma.paidLeaveGrant.findMany({ where: { userId }, orderBy: [{ expiresAt: "asc" }] });
   const activeGrants = grants.filter((grant) => grant.remainingMinutes > 0 && grant.expiresAt >= today);
@@ -732,9 +747,12 @@ const partGrantDays: Record<number, number[]> = {
   1: [1, 2, 2, 2, 3, 3, 3]
 };
 
-async function ensureAutoAnnualPaidLeaveGrants() {
+async function ensureAutoAnnualPaidLeaveGrants(userId?: string) {
   const today = toJstDateKey();
-  const users = await prisma.user.findMany({ where: { role: "STAFF", employmentStatus: "ACTIVE" }, include: { workSettings: true } });
+  const users = await prisma.user.findMany({
+    where: { role: "STAFF", employmentStatus: "ACTIVE", ...(userId ? { id: userId } : {}) },
+    include: { workSettings: true }
+  });
   for (const user of users) {
     for (const [index, grantDateKey] of annualGrantDateKeys(serializeUser(user)).entries()) {
       if (grantDateKey > today) continue;
@@ -762,9 +780,9 @@ async function ensureAutoAnnualPaidLeaveGrants() {
   }
 }
 
-async function recalculateLeaveGrantBalances() {
+async function recalculateLeaveGrantBalances(userId?: string) {
   const today = parseJstDate(toJstDateKey());
-  const grants = await prisma.paidLeaveGrant.findMany();
+  const grants = await prisma.paidLeaveGrant.findMany({ where: userId ? { userId } : undefined });
   for (const grant of grants) {
     await prisma.paidLeaveGrant.update({
       where: { id: grant.id },
@@ -775,7 +793,7 @@ async function recalculateLeaveGrantBalances() {
     });
   }
   const requests = await prisma.paidLeaveRequest.findMany({
-    where: { status: "APPROVED", leaveType: "PAID_LEAVE" },
+    where: { status: "APPROVED", leaveType: "PAID_LEAVE", ...(userId ? { userId } : {}) },
     orderBy: { startAt: "asc" }
   });
   for (const request of requests) {
@@ -800,6 +818,14 @@ async function recalculateLeaveGrantBalances() {
       if (remaining <= 0) break;
     }
   }
+}
+
+async function runDailyLeaveMaintenance() {
+  const today = toJstDateKey();
+  if (dailyLeaveMaintenanceKey === today) return;
+  dailyLeaveMaintenanceKey = today;
+  await ensureAutoAnnualPaidLeaveGrants();
+  await recalculateLeaveGrantBalances();
 }
 
 function annualGrantDateKeys(user: User) {
@@ -884,8 +910,6 @@ function monthBounds(month: string) {
 
 export async function getMonthData(month: string) {
   await ensureInitialData();
-  await ensureAutoAnnualPaidLeaveGrants();
-  await recalculateLeaveGrantBalances();
   const { start, next } = monthBounds(month);
   const [users, records, leaves, correctionRequests, leaveRequests, correctionLogs, leaveRequestHistory, paidLeaveGrants] = await Promise.all([
     prisma.user.findMany({ where: { role: "STAFF", employmentStatus: "ACTIVE" }, include: { workSettings: true } }),
@@ -945,7 +969,7 @@ export async function decideLeaveRequest(id: string, adminId: string, status: "A
     where: { id },
     data: { status, approverId: adminId, reviewedAt: new Date() }
   });
-  await recalculateLeaveGrantBalances();
+  await recalculateLeaveGrantBalances(request.userId);
   return serializeLeaveRequest(request);
 }
 
