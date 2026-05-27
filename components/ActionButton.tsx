@@ -25,7 +25,12 @@ export function ActionButton({ endpoint, children, className = "secondary", conf
       alert(payload?.error ?? "処理に失敗しました。");
     } else if (successMessage) {
       setMessage(successMessage);
-      window.setTimeout(() => setMessage(null), 3200);
+      window.setTimeout(() => {
+        setMessage(null);
+        router.refresh();
+      }, 1600);
+      setPending(false);
+      return;
     }
     setPending(false);
     router.refresh();

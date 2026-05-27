@@ -499,7 +499,7 @@ td:focus-within .tooltip {
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
-  z-index: 30;
+  z-index: 60;
   width: min(360px, calc(100% - 32px));
   padding: 14px 16px;
   border: 1px solid #cfe3d9;
@@ -673,6 +673,10 @@ td:focus-within .tooltip {
 
   .metric-row {
     grid-template-columns: 1fr;
+  }
+
+  .cheer-message {
+    bottom: 88px;
   }
 }
 
