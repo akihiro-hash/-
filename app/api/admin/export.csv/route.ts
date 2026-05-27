@@ -1,11 +1,22 @@
 import { requireAdmin } from "@/lib/auth";
-import { getMonthData, getStaffProfileSettings, getWorkingWeekdaySettings } from "@/lib/json-db";
+import { getMonthData, getStaffProfileSettings, getWorkingWeekdaySettings, isScheduledWorkday } from "@/lib/json-db";
 import { formatTime, minutesToHours, toJstDateKey } from "@/lib/time";
 import { getJpHolidayName } from "@/lib/jp-holidays";
 
 function csvCell(value: unknown) {
   const text = String(value ?? "");
   return `"${text.replaceAll('"', '""')}"`;
+}
+
+function monthDateKeys(month: string) {
+  const [year, monthIndex] = month.split("-").map(Number);
+  const days = new Date(year, monthIndex, 0).getDate();
+  return Array.from({ length: days }, (_, index) => `${month}-${String(index + 1).padStart(2, "0")}`);
+}
+
+function isHolidayOrWeekend(dateKey: string) {
+  const weekday = new Date(`${dateKey}T00:00:00+09:00`).getDay();
+  return weekday === 0 || weekday === 6 || !!getJpHolidayName(dateKey);
 }
 
 export async function GET(request: Request) {
@@ -20,9 +31,72 @@ export async function GET(request: Request) {
   const userMap = new Map(users.map((user) => [user.id, user]));
   const leaveMap = new Map(leaves.map((leave) => [`${leave.userId}:${leave.startAt.slice(0, 10)}`, leave]));
   const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
+  const dateKeys = monthDateKeys(month);
+  const todayKey = toJstDateKey();
+  const recordsByUser = new Map(users.map((user) => [user.id, records.filter((record) => record.userId === user.id)]));
+  const leavesByUser = new Map(users.map((user) => [user.id, leaves.filter((leave) => leave.userId === user.id)]));
+  const grantsByUser = new Map(users.map((user) => [user.id, paidLeaveGrants.filter((grant) => grant.userId === user.id)]));
 
   const rows = [
     [`社労士提出用 月次勤怠 ${month}`],
+    ["まず月次サマリーで全体確認し、必要な場合だけ下部の日別明細・休暇・修正ログを確認してください。"],
+    [],
+    ["月次サマリー"],
+    ["部署", "職種", "雇用形態", "氏名", "出勤日数/予定日数", "総勤務時間", "残業目安", "深夜目安", "オンコール平日", "オンコール土日祝", "緊急訪問", "休日出勤", "有給取得", "振休取得", "代休取得", "欠勤", "未打刻/退勤漏れ"],
+    ...users.map((user) => {
+      const userRecords = recordsByUser.get(user.id) ?? [];
+      const userLeaves = leavesByUser.get(user.id) ?? [];
+      const profile = profileSettings.get(user.id);
+      const scheduledDays = dateKeys.filter((dateKey) => isScheduledWorkday(user, dateKey, weekdaySettings) && !getJpHolidayName(dateKey)).length;
+      const attendanceDays = new Set(userRecords.filter((record) => record.clockInAt).map((record) => record.workDate)).size;
+      const onCallWeekday = userRecords.filter((record) => record.onCall && !isHolidayOrWeekend(record.workDate)).length;
+      const onCallHoliday = userRecords.filter((record) => record.onCall && isHolidayOrWeekend(record.workDate)).length;
+      const holidayWork = userRecords.filter((record) => record.clockInAt && isHolidayOrWeekend(record.workDate)).length;
+      const missing = dateKeys.filter((dateKey) => {
+        if (dateKey >= todayKey) return false;
+        if (!isScheduledWorkday(user, dateKey, weekdaySettings) || getJpHolidayName(dateKey)) return false;
+        const record = userRecords.find((item) => item.workDate === dateKey);
+        return !record || !record.clockInAt || !record.clockOutAt;
+      }).length;
+      const approvedLeaves = userLeaves.filter((leave) => leave.status === "APPROVED");
+      const leaveHours = (type: string) => minutesToHours(approvedLeaves.filter((leave) => leave.leaveType === type).reduce((sum, leave) => sum + leave.requestedMinutes, 0));
+      return [
+        user.department,
+        user.jobTitle ?? "",
+        profile?.employmentType ?? "正社員",
+        user.name,
+        `${attendanceDays}/${scheduledDays}`,
+        minutesToHours(userRecords.reduce((sum, record) => sum + record.workMins, 0)),
+        minutesToHours(userRecords.reduce((sum, record) => sum + record.overtimeMins, 0)),
+        minutesToHours(userRecords.reduce((sum, record) => sum + record.nightMins, 0)),
+        onCallWeekday,
+        onCallHoliday,
+        userRecords.reduce((sum, record) => sum + record.emergencyVisits, 0),
+        holidayWork,
+        leaveHours("PAID_LEAVE"),
+        leaveHours("COMPENSATORY_HOLIDAY"),
+        leaveHours("SUBSTITUTE_HOLIDAY"),
+        leaveHours("ABSENCE"),
+        missing
+      ];
+    }),
+    [],
+    ["休暇残数サマリー"],
+    ["氏名", "有給残日数", "振休残日数", "代休残日数", "半年以内の失効予定"],
+    ...users.map((user) => {
+      const grants = grantsByUser.get(user.id) ?? [];
+      const remainingDays = (type: string) => minutesToHours(grants.filter((grant) => (grant.leaveType ?? "PAID_LEAVE") === type && grant.status !== "EXPIRED").reduce((sum, grant) => sum + grant.remainingMinutes, 0)) / 8;
+      const expiring = grants
+        .filter((grant) => (grant.leaveType ?? "PAID_LEAVE") === "PAID_LEAVE" && grant.remainingMinutes > 0)
+        .sort((a, b) => a.expiresAt.localeCompare(b.expiresAt))[0];
+      return [
+        user.name,
+        remainingDays("PAID_LEAVE"),
+        remainingDays("COMPENSATORY_HOLIDAY"),
+        remainingDays("SUBSTITUTE_HOLIDAY"),
+        expiring ? `${expiring.expiresAt} / ${minutesToHours(expiring.remainingMinutes) / 8}日` : ""
+      ];
+    }),
     [],
     ["スタッフ一覧"],
     ["部署", "職種", "雇用形態", "氏名", "入社日", "在籍状態", "週所定日数", "週所定時間", "勤務曜日"],
