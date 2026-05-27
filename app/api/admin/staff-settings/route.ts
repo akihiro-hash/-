@@ -10,6 +10,8 @@ export async function POST(request: Request) {
     effectiveFrom: String(form.get("effectiveFrom") ?? ""),
     weeklyWorkDays: Number(form.get("weeklyWorkDays") ?? 5),
     weeklyWorkHours: Number(form.get("weeklyWorkHours") ?? 40),
+    standardStartTime: String(form.get("standardStartTime") ?? "09:00"),
+    standardEndTime: String(form.get("standardEndTime") ?? "18:00"),
     department: String(form.get("department") ?? ""),
     jobTitle: String(form.get("jobTitle") ?? "その他")
   });

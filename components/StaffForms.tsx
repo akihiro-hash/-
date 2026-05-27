@@ -114,13 +114,17 @@ export function CorrectionForm() {
 export function DirectAttendanceCorrectionForm({
   month,
   days,
-  registeredDates
-  , dayOperations
+  registeredDates,
+  dayOperations,
+  standardWorkByDate,
+  defaultStandardWork
 }: {
   month: string;
   days: number;
   registeredDates: string[];
   dayOperations: Record<string, { onCall: boolean; emergencyVisits: number }>;
+  standardWorkByDate: Record<string, { start: string; end: string; label: string }>;
+  defaultStandardWork: { start: string; end: string; label: string };
 }) {
   const { pending, submit, message } = useSubmit();
   const registered = new Set(registeredDates);
@@ -163,7 +167,9 @@ export function DirectAttendanceCorrectionForm({
       </div>
       <p className="muted">日付を押すと対象日に入ります。緑は登録済み、薄赤は未登録、赤枠は日曜・祝日です。</p>
       <div className="quick-time-grid">
-        <button className="secondary" type="button" onClick={(event) => fillCorrectionTimes(event.currentTarget.form, "09:00", "18:00")}>9:00-18:00</button>
+        <button className="secondary" type="button" onClick={(event) => fillCorrectionTimesForSelectedDate(event.currentTarget.form, standardWorkByDate, defaultStandardWork)}>
+          勤務設定 {defaultStandardWork.label}
+        </button>
       </div>
       <div className="metric-row">
         <label>
@@ -208,6 +214,17 @@ function fillCorrectionTimes(form: HTMLFormElement | null, clockIn: string, cloc
   const outInput = form.elements.namedItem("clockOut") as HTMLInputElement | null;
   if (inInput) inInput.value = clockIn;
   if (outInput) outInput.value = clockOut;
+}
+
+function fillCorrectionTimesForSelectedDate(
+  form: HTMLFormElement | null,
+  standardWorkByDate: Record<string, { start: string; end: string; label: string }>,
+  fallback: { start: string; end: string; label: string }
+) {
+  if (!form) return;
+  const dateInput = form.elements.namedItem("targetDate") as HTMLInputElement | null;
+  const standard = dateInput?.value ? standardWorkByDate[dateInput.value] ?? fallback : fallback;
+  fillCorrectionTimes(form, standard.start, standard.end);
 }
 
 export function DailyOperationsForm({ onCall, yesterdayVisits }: { onCall: boolean; yesterdayVisits: number }) {

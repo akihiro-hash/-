@@ -47,10 +47,14 @@ async function createDatabaseSchema() {
       "effectiveFrom" TIMESTAMP NOT NULL,
       "weeklyWorkDays" INTEGER NOT NULL,
       "weeklyWorkHours" DOUBLE PRECISION NOT NULL,
+      "standardStartTime" TEXT NOT NULL DEFAULT '09:00',
+      "standardEndTime" TEXT NOT NULL DEFAULT '18:00',
       "department" TEXT NOT NULL,
       "jobTitle" TEXT NOT NULL DEFAULT 'その他',
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "WorkSetting" ADD COLUMN IF NOT EXISTS "standardStartTime" TEXT NOT NULL DEFAULT '09:00'`,
+    `ALTER TABLE "WorkSetting" ADD COLUMN IF NOT EXISTS "standardEndTime" TEXT NOT NULL DEFAULT '18:00'`,
     `CREATE TABLE IF NOT EXISTS "AttendanceRecord" (
       "id" TEXT PRIMARY KEY,
       "userId" TEXT NOT NULL,

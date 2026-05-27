@@ -5,8 +5,10 @@ import { LeaveHistoryModal } from "@/components/LeaveHistoryModal";
 import { StaffQuickNav } from "@/components/StaffQuickNav";
 import { DailyOperationsForm, DirectAttendanceCorrectionForm, PaidLeaveForm } from "@/components/StaffForms";
 import { requireUser } from "@/lib/auth";
-import { getAttendanceRecord, getTodayAttendance, leaveSummary, readDb } from "@/lib/json-db";
+import { getAttendanceRecord, getStandardWorkForDate, getStandardWorkMap, getTodayAttendance, leaveSummary, readDb } from "@/lib/json-db";
 import { addDays, formatDate, formatTime, minutesToHours, monthRange, toJstDateKey } from "@/lib/time";
+
+export const dynamic = "force-dynamic";
 
 type Props = {
   searchParams: Promise<{ month?: string }>;
@@ -32,6 +34,8 @@ export default async function StaffPage({ searchParams }: Props) {
   const nextMonth = shiftMonth(month, 1);
   const db = await readDb();
   const monthRecords = db.attendanceRecords.filter((record) => record.userId === user.id && record.workDate.startsWith(month));
+  const todayStandardWork = await getStandardWorkForDate(user.id, toJstDateKey());
+  const standardWorkByDate = await getStandardWorkMap(user.id, month, days);
   const recordMap = new Map(monthRecords.map((record) => [record.workDate, record]));
   const registeredDates = monthRecords
     .filter((record) => record.clockInAt || record.clockOutAt)
@@ -87,7 +91,7 @@ export default async function StaffPage({ searchParams }: Props) {
         <div className="clock-grid no-print">
           <ActionButton endpoint="/api/clock-in" className="primary">出勤</ActionButton>
           <ActionButton endpoint="/api/clock-out" className="primary" successMessage="今日も一日お疲れさまでした">退勤</ActionButton>
-          <ActionButton endpoint="/api/standard-work" className="secondary">通常勤務 9:00-18:00</ActionButton>
+          <ActionButton endpoint="/api/standard-work" className="secondary">通常勤務 {todayStandardWork.label}</ActionButton>
         </div>
       </section>
 
@@ -137,7 +141,7 @@ export default async function StaffPage({ searchParams }: Props) {
         <summary className="accordion-summary">出退勤の修正</summary>
         <div className="accordion-body">
           <p className="muted">スタッフ側で修正できるのは当月分のみです。修正内容は管理者画面にログとして残ります。</p>
-          <DirectAttendanceCorrectionForm month={month} days={days} registeredDates={registeredDates} dayOperations={dayOperations} />
+          <DirectAttendanceCorrectionForm month={month} days={days} registeredDates={registeredDates} dayOperations={dayOperations} standardWorkByDate={standardWorkByDate} defaultStandardWork={todayStandardWork} />
         </div>
       </details>
 

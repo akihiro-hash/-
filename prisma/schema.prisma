@@ -40,6 +40,8 @@ model WorkSetting {
   effectiveFrom   DateTime
   weeklyWorkDays  Int
   weeklyWorkHours Float
+  standardStartTime String @default("09:00")
+  standardEndTime   String @default("18:00")
   department      String
   jobTitle        String   @default("その他")
   createdAt       DateTime @default(now())

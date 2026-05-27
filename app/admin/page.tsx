@@ -5,6 +5,8 @@ import { getMonthData, leaveSummary } from "@/lib/json-db";
 import { formatTime, minutesToHours, monthRange, toJstDateKey } from "@/lib/time";
 import { getJpHolidayName } from "@/lib/jp-holidays";
 
+export const dynamic = "force-dynamic";
+
 type Props = {
   searchParams: Promise<{ month?: string }>;
 };
@@ -477,6 +479,14 @@ export default async function AdminPage({ searchParams }: Props) {
           <label>
             週所定時間
             <input name="weeklyWorkHours" type="number" min="1" step="0.5" defaultValue="40" required />
+          </label>
+          <label>
+            標準出勤
+            <input name="standardStartTime" type="time" defaultValue="09:00" required />
+          </label>
+          <label>
+            標準退勤
+            <input name="standardEndTime" type="time" defaultValue="18:00" required />
           </label>
           <button className="primary">設定を保存</button>
         </form>

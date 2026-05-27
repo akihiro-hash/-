@@ -22,6 +22,8 @@ export type WorkSetting = {
   effectiveFrom: string;
   weeklyWorkDays: number;
   weeklyWorkHours: number;
+  standardStartTime: string;
+  standardEndTime: string;
   department: string;
   jobTitle?: string;
 };
@@ -105,6 +107,146 @@ type DbSnapshot = {
   correctionLogs: CorrectionLog[];
 };
 
+let schemaReady: Promise<void> | null = null;
+
+async function ensureDatabaseSchema() {
+  schemaReady ??= createDatabaseSchema();
+  return schemaReady;
+}
+
+async function createDatabaseSchema() {
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS "User" (
+      "id" TEXT PRIMARY KEY,
+      "name" TEXT NOT NULL,
+      "email" TEXT NOT NULL UNIQUE,
+      "passwordHash" TEXT NOT NULL,
+      "role" TEXT NOT NULL DEFAULT 'STAFF',
+      "department" TEXT NOT NULL,
+      "hireDate" TIMESTAMP NOT NULL,
+      "weeklyWorkDays" INTEGER NOT NULL,
+      "weeklyWorkHours" DOUBLE PRECISION NOT NULL,
+      "employmentStatus" TEXT NOT NULL DEFAULT 'ACTIVE',
+      "jobTitle" TEXT NOT NULL DEFAULT 'その他',
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS "WorkSetting" (
+      "id" TEXT PRIMARY KEY,
+      "userId" TEXT NOT NULL,
+      "effectiveFrom" TIMESTAMP NOT NULL,
+      "weeklyWorkDays" INTEGER NOT NULL,
+      "weeklyWorkHours" DOUBLE PRECISION NOT NULL,
+      "standardStartTime" TEXT NOT NULL DEFAULT '09:00',
+      "standardEndTime" TEXT NOT NULL DEFAULT '18:00',
+      "department" TEXT NOT NULL,
+      "jobTitle" TEXT NOT NULL DEFAULT 'その他',
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `ALTER TABLE "WorkSetting" ADD COLUMN IF NOT EXISTS "standardStartTime" TEXT NOT NULL DEFAULT '09:00'`,
+    `ALTER TABLE "WorkSetting" ADD COLUMN IF NOT EXISTS "standardEndTime" TEXT NOT NULL DEFAULT '18:00'`,
+    `CREATE TABLE IF NOT EXISTS "AttendanceRecord" (
+      "id" TEXT PRIMARY KEY,
+      "userId" TEXT NOT NULL,
+      "workDate" TIMESTAMP NOT NULL,
+      "clockInAt" TIMESTAMP,
+      "clockOutAt" TIMESTAMP,
+      "totalBreakMins" INTEGER NOT NULL DEFAULT 0,
+      "workMins" INTEGER NOT NULL DEFAULT 0,
+      "overtimeMins" INTEGER NOT NULL DEFAULT 0,
+      "nightMins" INTEGER NOT NULL DEFAULT 0,
+      "status" TEXT NOT NULL DEFAULT 'PENDING',
+      "onCall" BOOLEAN NOT NULL DEFAULT false,
+      "emergencyVisits" INTEGER NOT NULL DEFAULT 0,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "AttendanceRecord_userId_workDate_key" ON "AttendanceRecord" ("userId", "workDate")`,
+    `CREATE TABLE IF NOT EXISTS "BreakRecord" (
+      "id" TEXT PRIMARY KEY,
+      "attendanceRecordId" TEXT NOT NULL,
+      "breakStartAt" TIMESTAMP NOT NULL,
+      "breakEndAt" TIMESTAMP,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS "CorrectionRequest" (
+      "id" TEXT PRIMARY KEY,
+      "userId" TEXT NOT NULL,
+      "targetDate" TIMESTAMP NOT NULL,
+      "requestedClockInAt" TIMESTAMP,
+      "requestedClockOutAt" TIMESTAMP,
+      "reason" TEXT NOT NULL,
+      "status" TEXT NOT NULL DEFAULT 'PENDING',
+      "approverId" TEXT,
+      "reviewedAt" TIMESTAMP,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS "CorrectionLog" (
+      "id" TEXT PRIMARY KEY,
+      "userId" TEXT NOT NULL,
+      "targetDate" TIMESTAMP NOT NULL,
+      "actorId" TEXT NOT NULL,
+      "actorRole" TEXT NOT NULL,
+      "beforeClockInAt" TIMESTAMP,
+      "beforeClockOutAt" TIMESTAMP,
+      "afterClockInAt" TIMESTAMP,
+      "afterClockOutAt" TIMESTAMP,
+      "reason" TEXT NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS "PaidLeaveGrant" (
+      "id" TEXT PRIMARY KEY,
+      "userId" TEXT NOT NULL,
+      "grantDate" TIMESTAMP NOT NULL,
+      "expiresAt" TIMESTAMP NOT NULL,
+      "grantedMinutes" INTEGER NOT NULL,
+      "remainingMinutes" INTEGER NOT NULL,
+      "source" TEXT NOT NULL,
+      "status" TEXT NOT NULL DEFAULT 'CONFIRMED',
+      "note" TEXT,
+      "leaveType" TEXT NOT NULL DEFAULT 'PAID_LEAVE',
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS "PaidLeaveRequest" (
+      "id" TEXT PRIMARY KEY,
+      "userId" TEXT NOT NULL,
+      "leaveType" TEXT NOT NULL,
+      "unit" TEXT NOT NULL,
+      "halfDayPeriod" TEXT,
+      "startAt" TIMESTAMP NOT NULL,
+      "endAt" TIMESTAMP NOT NULL,
+      "requestedMinutes" INTEGER NOT NULL,
+      "reason" TEXT NOT NULL,
+      "status" TEXT NOT NULL DEFAULT 'PENDING',
+      "approverId" TEXT,
+      "reviewedAt" TIMESTAMP,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS "PaidLeaveUsage" (
+      "id" TEXT PRIMARY KEY,
+      "requestId" TEXT NOT NULL,
+      "grantId" TEXT NOT NULL,
+      "usedMinutes" INTEGER NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS "AuditLog" (
+      "id" TEXT PRIMARY KEY,
+      "userId" TEXT NOT NULL,
+      "action" TEXT NOT NULL,
+      "targetType" TEXT NOT NULL,
+      "targetId" TEXT NOT NULL,
+      "payload" JSONB NOT NULL,
+      "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`
+  ];
+
+  for (const statement of statements) {
+    await prisma.$executeRawUnsafe(statement);
+  }
+}
+
 function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const hash = pbkdf2Sync(password, salt, 120000, 64, "sha512").toString("hex");
@@ -135,6 +277,8 @@ function serializeWorkSetting(setting: any): WorkSetting {
     effectiveFrom: dateKey(setting.effectiveFrom),
     weeklyWorkDays: setting.weeklyWorkDays,
     weeklyWorkHours: setting.weeklyWorkHours,
+    standardStartTime: setting.standardStartTime ?? "09:00",
+    standardEndTime: setting.standardEndTime ?? "18:00",
     department: setting.department,
     jobTitle: setting.jobTitle
   };
@@ -220,6 +364,7 @@ function serializeCorrectionLog(log: any): CorrectionLog {
 }
 
 async function ensureInitialData() {
+  await ensureDatabaseSchema();
   const count = await prisma.user.count();
   if (count > 0) return;
   await prisma.user.createMany({
@@ -296,6 +441,8 @@ export async function updateStaffSettings(input: {
   effectiveFrom: string;
   weeklyWorkDays: number;
   weeklyWorkHours: number;
+  standardStartTime: string;
+  standardEndTime: string;
   department: string;
   jobTitle: string;
 }) {
@@ -307,6 +454,8 @@ export async function updateStaffSettings(input: {
       effectiveFrom: parseJstDate(input.effectiveFrom || toJstDateKey()),
       weeklyWorkDays: Math.max(1, Math.min(7, Math.floor(input.weeklyWorkDays))),
       weeklyWorkHours: Math.max(1, input.weeklyWorkHours),
+      standardStartTime: normalizeTimeInput(input.standardStartTime, "09:00"),
+      standardEndTime: normalizeTimeInput(input.standardEndTime, "18:00"),
       department: input.department || user.department,
       jobTitle: input.jobTitle || user.jobTitle || "その他"
     }
@@ -375,7 +524,7 @@ export async function updateAttendance(userId: string, action: "CLOCK_IN" | "CLO
     update: {},
     create: { userId, workDate: parseJstDate(today) }
   });
-  const now = normalizePunchTime(new Date(), action);
+  const now = await normalizePunchTime(userId, new Date(), action);
   const data: Record<string, Date> = {};
   if (action === "CLOCK_IN" && !current.clockInAt) data.clockInAt = now;
   if (action === "CLOCK_OUT" && current.clockInAt && !current.clockOutAt) data.clockOutAt = now;
@@ -386,26 +535,30 @@ export async function updateAttendance(userId: string, action: "CLOCK_IN" | "CLO
 }
 
 export async function setTodayStandardWork(userId: string) {
+  const standard = await getStandardWorkForDate(userId, toJstDateKey());
   return saveAttendanceCorrection({
     userId,
     actorId: userId,
     actorRole: "STAFF",
     targetDate: toJstDateKey(),
-    clockIn: "09:00",
-    clockOut: "18:00",
+    clockIn: standard.start,
+    clockOut: standard.end,
     reason: "通常勤務"
   });
 }
 
-function normalizePunchTime(value: Date, action: "CLOCK_IN" | "CLOCK_OUT") {
+async function normalizePunchTime(userId: string, value: Date, action: "CLOCK_IN" | "CLOCK_OUT") {
   const result = new Date(value);
   const jst = new Date(value.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
   const minutes = jst.getHours() * 60 + jst.getMinutes();
-  if (action === "CLOCK_IN" && minutes >= 8 * 60 && minutes <= 9 * 60) {
-    result.setTime(new Date(`${toJstDateKey(value)}T09:00:00+09:00`).getTime());
+  const standard = await getStandardWorkForDate(userId, toJstDateKey(value));
+  const startMinutes = timeToMinutes(standard.start);
+  const endMinutes = timeToMinutes(standard.end);
+  if (action === "CLOCK_IN" && minutes >= startMinutes - 60 && minutes <= startMinutes) {
+    result.setTime(new Date(`${toJstDateKey(value)}T${standard.start}:00+09:00`).getTime());
   }
-  if (action === "CLOCK_OUT" && minutes >= 17 * 60 + 30 && minutes <= 18 * 60) {
-    result.setTime(new Date(`${toJstDateKey(value)}T18:00:00+09:00`).getTime());
+  if (action === "CLOCK_OUT" && minutes >= endMinutes - 30 && minutes <= endMinutes) {
+    result.setTime(new Date(`${toJstDateKey(value)}T${standard.end}:00+09:00`).getTime());
   }
   return result;
 }
@@ -418,7 +571,7 @@ async function recalcRecord(id: string) {
   const spanMins = start && end ? Math.max(0, Math.round((end - start) / 60000)) : 0;
   const totalBreakMins = spanMins >= 6 * 60 ? 60 : 0;
   const workMins = start && end ? Math.max(0, spanMins - totalBreakMins) : 0;
-  const overtimeMins = calculateOvertime(record.clockOutAt);
+  const overtimeMins = await calculateOvertime(record.userId, record.workDate, record.clockOutAt);
   const status = record.clockInAt && record.clockOutAt ? "NORMAL" : record.clockInAt ? "MISSING_CLOCK" : "PENDING";
   return prisma.attendanceRecord.update({
     where: { id },
@@ -426,10 +579,11 @@ async function recalcRecord(id: string) {
   });
 }
 
-function calculateOvertime(clockOutAt: Date | null) {
+async function calculateOvertime(userId: string, workDate: Date, clockOutAt: Date | null) {
   if (!clockOutAt) return 0;
-  const date = toJstDateKey(clockOutAt);
-  const standardEnd = new Date(`${date}T18:00:00+09:00`).getTime();
+  const date = dateKey(workDate);
+  const standard = await getStandardWorkForDate(userId, date);
+  const standardEnd = new Date(`${date}T${standard.end}:00+09:00`).getTime();
   return Math.max(0, Math.round((clockOutAt.getTime() - standardEnd) / 60000));
 }
 
@@ -642,6 +796,47 @@ function effectiveWorkSetting(user: User, dateKey: string) {
     .filter((setting) => setting.effectiveFrom <= dateKey)
     .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
   return settings[0] ?? user;
+}
+
+export async function getStandardWorkForDate(userId: string, targetDate: string) {
+  const user = await findUserById(userId);
+  if (!user) return { start: "09:00", end: "18:00", label: "9:00-18:00" };
+  const setting = effectiveWorkSetting(user, targetDate) as User | WorkSetting;
+  const start = "standardStartTime" in setting ? setting.standardStartTime : "09:00";
+  const end = "standardEndTime" in setting ? setting.standardEndTime : inferStandardEnd(start, setting.weeklyWorkDays, setting.weeklyWorkHours);
+  return { start, end, label: `${trimTime(start)}-${trimTime(end)}` };
+}
+
+export async function getStandardWorkMap(userId: string, month: string, days: number) {
+  const entries = await Promise.all(
+    Array.from({ length: days }, async (_, index) => {
+      const date = `${month}-${String(index + 1).padStart(2, "0")}`;
+      return [date, await getStandardWorkForDate(userId, date)] as const;
+    })
+  );
+  return Object.fromEntries(entries);
+}
+
+function normalizeTimeInput(value: string, fallback: string) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : fallback;
+}
+
+function timeToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function inferStandardEnd(start: string, weeklyWorkDays: number, weeklyWorkHours: number) {
+  const dailyWorkMinutes = Math.round((weeklyWorkHours / Math.max(1, weeklyWorkDays)) * 60);
+  const breakMinutes = dailyWorkMinutes >= 6 * 60 ? 60 : 0;
+  const endMinutes = timeToMinutes(start) + dailyWorkMinutes + breakMinutes;
+  const hours = Math.floor(endMinutes / 60);
+  const minutes = endMinutes % 60;
+  return `${String(Math.min(23, hours)).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function trimTime(value: string) {
+  return value.startsWith("0") ? value.slice(1) : value;
 }
 
 function annualGrantDays(weeklyWorkDays: number, weeklyWorkHours: number, grantIndex: number) {
