@@ -28,6 +28,13 @@ function calculateEndTime(start: string, weeklyDays: number, weeklyHours: number
   return minutesToTime(timeToMinutes(start) + dailyMinutes + breakMinutes);
 }
 
+function calculateWeeklyHours(start: string, end: string, weeklyDays: number) {
+  const spanMinutes = Math.max(0, timeToMinutes(end) - timeToMinutes(start));
+  const breakMinutes = spanMinutes >= 7 * 60 ? 60 : 0;
+  const dailyWorkHours = Math.max(0, spanMinutes - breakMinutes) / 60;
+  return Math.round(dailyWorkHours * Math.max(1, weeklyDays) * 2) / 2;
+}
+
 export function StaffSettingsForm({ users, jobTitles }: Props) {
   function syncEndTime(form: HTMLFormElement) {
     const weeklyDays = form.elements.namedItem("weeklyWorkDays") as HTMLInputElement | null;
@@ -36,6 +43,15 @@ export function StaffSettingsForm({ users, jobTitles }: Props) {
     const endTime = form.elements.namedItem("standardEndTime") as HTMLInputElement | null;
     if (!weeklyDays || !weeklyHours || !startTime || !endTime) return;
     endTime.value = calculateEndTime(startTime.value || "09:00", Number(weeklyDays.value || 5), Number(weeklyHours.value || 40));
+  }
+
+  function syncWeeklyHours(form: HTMLFormElement) {
+    const weeklyDays = form.elements.namedItem("weeklyWorkDays") as HTMLInputElement | null;
+    const weeklyHours = form.elements.namedItem("weeklyWorkHours") as HTMLInputElement | null;
+    const startTime = form.elements.namedItem("standardStartTime") as HTMLInputElement | null;
+    const endTime = form.elements.namedItem("standardEndTime") as HTMLInputElement | null;
+    if (!weeklyDays || !weeklyHours || !startTime || !endTime) return;
+    weeklyHours.value = String(calculateWeeklyHours(startTime.value || "09:00", endTime.value || "18:00", Number(weeklyDays.value || 5)));
   }
 
   return (
@@ -74,7 +90,7 @@ export function StaffSettingsForm({ users, jobTitles }: Props) {
       </label>
       <label>
         標準退勤
-        <input name="standardEndTime" type="time" defaultValue="18:00" required />
+        <input name="standardEndTime" type="time" defaultValue="18:00" required onChange={(event) => event.currentTarget.form && syncWeeklyHours(event.currentTarget.form)} />
       </label>
       <button className="primary">設定を保存</button>
     </form>
