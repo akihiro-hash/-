@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { StaffQuickNav } from "@/components/StaffQuickNav";
 import { requireUser } from "@/lib/auth";
 import { getUserMonthAttendanceRecords } from "@/lib/json-db";
 import { formatDate, formatTime, minutesToHours, monthRange, toJstDateKey } from "@/lib/time";
@@ -53,6 +54,7 @@ export default async function StaffMonthPage({ searchParams }: Props) {
           })}
         </div>
       </section>
+      <StaffQuickNav />
     </main>
   );
 }

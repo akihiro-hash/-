@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { LeaveGrantHistoryModal } from "@/components/LeaveGrantHistoryModal";
 import { LeaveHistoryModal } from "@/components/LeaveHistoryModal";
+import { StaffQuickNav } from "@/components/StaffQuickNav";
 import { PaidLeaveForm } from "@/components/StaffForms";
 import { requireUser } from "@/lib/auth";
 import { getRecentLeaveRequests, leaveSummary } from "@/lib/json-db";
@@ -41,6 +42,7 @@ export default async function StaffLeavePage() {
         <h2>休暇申請</h2>
         <PaidLeaveForm />
       </section>
+      <StaffQuickNav />
     </main>
   );
 }

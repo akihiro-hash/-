@@ -210,7 +210,7 @@ textarea {
   backdrop-filter: blur(12px);
 }
 
-.staff-quick-nav button {
+.staff-quick-nav a {
   display: grid;
   place-items: center;
   gap: 2px;
@@ -220,10 +220,11 @@ textarea {
   color: var(--text);
   background: transparent;
   font-weight: 800;
+  text-decoration: none;
 }
 
-.staff-quick-nav button:active,
-.staff-quick-nav button:focus-visible {
+.staff-quick-nav a:active,
+.staff-quick-nav a:focus-visible {
   outline: 2px solid rgba(47, 125, 104, 0.35);
   background: var(--soft-green);
 }

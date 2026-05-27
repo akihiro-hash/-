@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { ActionButton } from "@/components/ActionButton";
+import { StaffQuickNav } from "@/components/StaffQuickNav";
 import { DailyOperationsForm } from "@/components/StaffForms";
 import { requireUser } from "@/lib/auth";
 import { getAttendanceRecord, getStandardWorkForDate, getTodayAttendance } from "@/lib/json-db";
@@ -67,6 +68,7 @@ export default async function StaffPage() {
           <a className="secondary" href="/staff/month">今月の勤怠</a>
         </div>
       </section>
+      <StaffQuickNav />
     </main>
   );
 }

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { StaffQuickNav } from "@/components/StaffQuickNav";
 import { DirectAttendanceCorrectionForm } from "@/components/StaffForms";
 import { requireUser } from "@/lib/auth";
 import { getStandardWorkForDate, getStandardWorkMap, getUserMonthAttendanceRecords } from "@/lib/json-db";
@@ -32,6 +33,7 @@ export default async function StaffCorrectionPage({ searchParams }: Props) {
         <p className="muted">スタッフ側で修正できるのは当月分のみです。修正内容は管理者画面にログとして残ります。</p>
         <DirectAttendanceCorrectionForm month={month} days={days} registeredDates={registeredDates} dayOperations={dayOperations} standardWorkByDate={standardWorkByDate} defaultStandardWork={todayStandardWork} />
       </section>
+      <StaffQuickNav />
     </main>
   );
 }
