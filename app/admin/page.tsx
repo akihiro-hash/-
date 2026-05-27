@@ -9,7 +9,7 @@ import { getJpHolidayName } from "@/lib/jp-holidays";
 export const dynamic = "force-dynamic";
 
 type Props = {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; saved?: string }>;
 };
 
 const statusLabels: Record<string, string> = {
@@ -48,6 +48,11 @@ const requestStatusLabels: Record<string, string> = {
 };
 
 const jobTitles = ["看護師", "理学療法士", "作業療法士", "言語聴覚士", "その他"];
+
+const savedMessages: Record<string, string> = {
+  "staff-added": "スタッフを追加しました。",
+  "staff-settings": "スタッフ勤務設定を保存しました。"
+};
 
 type LeaveRequestLike = {
   leaveType: string;
@@ -111,6 +116,12 @@ export default async function AdminPage({ searchParams }: Props) {
           <AdminHelpModal />
         </form>
       </section>
+
+      {params.saved && savedMessages[params.saved] && (
+        <section className="card success-note no-print">
+          {savedMessages[params.saved]}
+        </section>
+      )}
 
       {(leaveRequests.length > 0 || correctionRequests.length > 0) && (
         <section className="card alert no-print">
@@ -412,47 +423,56 @@ export default async function AdminPage({ searchParams }: Props) {
       </section>
 
       <section className="card no-print">
-        <h2>スタッフ追加</h2>
-        <p className="muted">新しいスタッフを追加します。初期パスワードは全員 `password123` です。</p>
-        <form className="admin-actions" action="/api/admin/staff" method="post">
-          <label>
-            氏名
-            <input name="name" required />
-          </label>
-          <label>
-            メール
-            <input name="email" type="email" required />
-          </label>
-          <label>
-            職種
-            <select name="jobTitle" defaultValue="看護師">
-              {jobTitles.map((jobTitle) => <option value={jobTitle} key={jobTitle}>{jobTitle}</option>)}
-            </select>
-          </label>
-          <label>
-            部署
-            <input name="department" defaultValue="訪問看護" required />
-          </label>
-          <label>
-            入社日
-            <input name="hireDate" type="date" required />
-          </label>
-          <label>
-            週所定日数
-            <input name="weeklyWorkDays" type="number" min="1" max="7" step="1" defaultValue="5" required />
-          </label>
-          <label>
-            週所定時間
-            <input name="weeklyWorkHours" type="number" min="1" step="0.5" defaultValue="40" required />
-          </label>
-          <button className="primary">スタッフを追加</button>
-        </form>
-      </section>
+        <h2>スタッフ管理</h2>
+        <p className="muted">新規スタッフの追加と、既存スタッフの勤務条件変更をここで管理します。</p>
 
-      <section className="card no-print">
-        <h2>スタッフ勤務設定</h2>
-        <p className="muted">パートさんなど、週の所定労働日数・時間を適用開始日つきで設定します。有給の自動付与は付与日時点の設定で計算します。</p>
-        <StaffSettingsForm users={users.map((user) => ({ id: user.id, name: user.name }))} jobTitles={jobTitles} />
+        <details className="accordion-card" open>
+          <summary className="accordion-summary">新規スタッフを追加</summary>
+          <div className="accordion-body">
+            <p className="muted">初期パスワードは全員 `password123` です。</p>
+            <form className="admin-actions" action="/api/admin/staff" method="post">
+              <label>
+                氏名
+                <input name="name" required />
+              </label>
+              <label>
+                メール
+                <input name="email" type="email" required />
+              </label>
+              <label>
+                職種
+                <select name="jobTitle" defaultValue="看護師">
+                  {jobTitles.map((jobTitle) => <option value={jobTitle} key={jobTitle}>{jobTitle}</option>)}
+                </select>
+              </label>
+              <label>
+                部署
+                <input name="department" defaultValue="訪問看護" required />
+              </label>
+              <label>
+                入社日
+                <input name="hireDate" type="date" required />
+              </label>
+              <label>
+                週所定日数
+                <input name="weeklyWorkDays" type="number" min="1" max="7" step="1" defaultValue="5" required />
+              </label>
+              <label>
+                週所定時間
+                <input name="weeklyWorkHours" type="number" min="1" step="0.5" defaultValue="40" required />
+              </label>
+              <button className="primary">スタッフを追加</button>
+            </form>
+          </div>
+        </details>
+
+        <details className="accordion-card">
+          <summary className="accordion-summary">既存スタッフの勤務設定を変更</summary>
+          <div className="accordion-body">
+            <p className="muted">パートさんなど、週の所定労働日数・時間を適用開始日つきで設定します。有給の自動付与は付与日時点の設定で計算します。</p>
+            <StaffSettingsForm users={users.map((user) => ({ id: user.id, name: user.name }))} jobTitles={jobTitles} />
+          </div>
+        </details>
       </section>
     </main>
   );

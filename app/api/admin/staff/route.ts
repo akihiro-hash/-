@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       weeklyWorkDays: Number(form.get("weeklyWorkDays") ?? 5),
       weeklyWorkHours: Number(form.get("weeklyWorkHours") ?? 40)
     });
-    return NextResponse.redirect(new URL("/admin", request.url), 303);
+    return NextResponse.redirect(new URL("/admin?saved=staff-added", request.url), 303);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "スタッフを追加できませんでした。" }, { status: 400 });
   }

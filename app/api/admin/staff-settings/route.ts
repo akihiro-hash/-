@@ -15,5 +15,5 @@ export async function POST(request: Request) {
     department: String(form.get("department") ?? ""),
     jobTitle: String(form.get("jobTitle") ?? "その他")
   });
-  return NextResponse.redirect(new URL("/admin", request.url), 303);
+  return NextResponse.redirect(new URL("/admin?saved=staff-settings", request.url), 303);
 }
