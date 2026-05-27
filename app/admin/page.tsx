@@ -106,6 +106,15 @@ export default async function AdminPage({ searchParams }: Props) {
       return null;
     }).filter((item): item is { user: typeof user; dateKey: string; message: string } => !!item)
   );
+  const missingAlertsByUser = new Map<string, { user: (typeof users)[number]; items: typeof missingAlerts }>();
+  for (const alert of missingAlerts) {
+    const current = missingAlertsByUser.get(alert.user.id);
+    if (current) {
+      current.items.push(alert);
+    } else {
+      missingAlertsByUser.set(alert.user.id, { user: alert.user, items: [alert] });
+    }
+  }
   const holidayWorkCandidates = records
     .filter((record) => {
       if (!record.clockInAt) return false;
@@ -113,6 +122,16 @@ export default async function AdminPage({ searchParams }: Props) {
       return weekday === 0 || weekday === 6 || !!getJpHolidayName(record.workDate);
     })
     .map((record) => ({ record, user: users.find((user) => user.id === record.userId), holiday: getJpHolidayName(record.workDate) }));
+  const holidayWorkByUser = new Map<string, { userName: string; items: typeof holidayWorkCandidates }>();
+  for (const candidate of holidayWorkCandidates) {
+    const key = candidate.user?.id ?? candidate.record.userId;
+    const current = holidayWorkByUser.get(key);
+    if (current) {
+      current.items.push(candidate);
+    } else {
+      holidayWorkByUser.set(key, { userName: candidate.user?.name ?? "スタッフ", items: [candidate] });
+    }
+  }
 
   return (
     <main className="admin-shell">
@@ -171,13 +190,20 @@ export default async function AdminPage({ searchParams }: Props) {
       {missingAlerts.length > 0 && (
         <section className="card alert no-print">
           <h2>未打刻・退勤漏れアラート</h2>
-          <p>{missingAlerts.length}件あります。必要に応じてスタッフへ確認してください。</p>
-          <div className="day-list compact-list">
-            {missingAlerts.slice(0, 12).map((item) => (
-              <div className="day-item" key={`${item.user.id}:${item.dateKey}`}>
-                <strong>{item.user.name}</strong>
-                <span>{item.dateKey} / {item.message}</span>
-              </div>
+          <p>{missingAlerts.length}件あります。スタッフごとに確認できます。</p>
+          <div className="alert-group-list">
+            {[...missingAlertsByUser.values()].map(({ user, items }) => (
+              <details className="day-item alert-detail" key={user.id}>
+                <summary>
+                  <strong>{user.name}</strong>
+                  <span>{items.length}件</span>
+                </summary>
+                <div className="detail-body">
+                  {items.map((item) => (
+                    <span key={`${item.user.id}:${item.dateKey}`}>{item.dateKey} / {item.message}</span>
+                  ))}
+                </div>
+              </details>
             ))}
           </div>
         </section>
@@ -187,12 +213,19 @@ export default async function AdminPage({ searchParams }: Props) {
         <section className="card alert no-print">
           <h2>休日出勤候補</h2>
           <p>土日祝の出勤が {holidayWorkCandidates.length}件あります。代休付与が必要か確認してください。</p>
-          <div className="day-list compact-list">
-            {holidayWorkCandidates.slice(0, 12).map(({ record, user, holiday }) => (
-              <div className="day-item" key={record.id}>
-                <strong>{user?.name ?? "スタッフ"}</strong>
-                <span>{record.workDate} {holiday ? `/ ${holiday}` : "/ 土日"} / 出勤 {formatTime(record.clockInAt ? new Date(record.clockInAt) : null)}</span>
-              </div>
+          <div className="alert-group-list">
+            {[...holidayWorkByUser.entries()].map(([userId, group]) => (
+              <details className="day-item alert-detail" key={userId}>
+                <summary>
+                  <strong>{group.userName}</strong>
+                  <span>{group.items.length}件</span>
+                </summary>
+                <div className="detail-body">
+                  {group.items.map(({ record, holiday }) => (
+                    <span key={record.id}>{record.workDate} {holiday ? `/ ${holiday}` : "/ 土日"} / 出勤 {formatTime(record.clockInAt ? new Date(record.clockInAt) : null)}</span>
+                  ))}
+                </div>
+              </details>
             ))}
           </div>
         </section>
@@ -544,6 +577,23 @@ export default async function AdminPage({ searchParams }: Props) {
                 週所定日数
                 <input name="weeklyWorkDays" type="number" min="1" max="7" step="1" defaultValue="5" required />
               </label>
+              <fieldset className="weekday-picker">
+                <legend>勤務曜日</legend>
+                {[
+                  ["1", "月"],
+                  ["2", "火"],
+                  ["3", "水"],
+                  ["4", "木"],
+                  ["5", "金"],
+                  ["6", "土"],
+                  ["0", "日"]
+                ].map(([value, label]) => (
+                  <label className="check-row weekday-check" key={value}>
+                    <input name="workingWeekdays" type="checkbox" value={value} defaultChecked={["1", "2", "3", "4", "5"].includes(value)} />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </fieldset>
               <label>
                 週所定時間
                 <input name="weeklyWorkHours" type="number" min="1" step="0.5" defaultValue="40" required />

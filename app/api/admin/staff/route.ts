@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
-import { createAuditLog, createStaff } from "@/lib/json-db";
+import { createAuditLog, createStaff, normalizeWorkingWeekdays } from "@/lib/json-db";
 
 export async function POST(request: Request) {
   const admin = await requireAdmin();
   const form = await request.formData();
+  const workingWeekdays = normalizeWorkingWeekdays(form.getAll("workingWeekdays"));
   try {
     const user = await createStaff({
       name: String(form.get("name") ?? ""),
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
       department: String(form.get("department") ?? ""),
       jobTitle: String(form.get("jobTitle") ?? "その他"),
       hireDate: String(form.get("hireDate") ?? ""),
-      weeklyWorkDays: Number(form.get("weeklyWorkDays") ?? 5),
+      weeklyWorkDays: workingWeekdays.length || Number(form.get("weeklyWorkDays") ?? 5),
       weeklyWorkHours: Number(form.get("weeklyWorkHours") ?? 40)
     });
     await createAuditLog({
@@ -20,7 +21,14 @@ export async function POST(request: Request) {
       action: "STAFF_CREATE",
       entityType: "USER",
       entityId: user.id,
-      details: { name: user.name, jobTitle: user.jobTitle }
+      details: { name: user.name, jobTitle: user.jobTitle, effectiveFrom: user.hireDate, workingWeekdays }
+    });
+    await createAuditLog({
+      actorId: admin.id,
+      action: "STAFF_SETTINGS_UPDATE",
+      entityType: "USER",
+      entityId: user.id,
+      details: { effectiveFrom: user.hireDate, employmentStatus: "ACTIVE", workingWeekdays }
     });
     return NextResponse.redirect(new URL("/admin?saved=staff-added", request.url), 303);
   } catch (error) {

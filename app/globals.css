@@ -320,6 +320,11 @@ textarea {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.alert-group-list {
+  display: grid;
+  gap: 8px;
+}
+
 .day-item {
   display: grid;
   gap: 4px;
@@ -327,6 +332,38 @@ textarea {
   border-radius: 6px;
   padding: 12px;
   background: white;
+}
+
+.alert-detail {
+  padding: 0;
+  overflow: hidden;
+}
+
+.alert-detail summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.alert-detail summary::-webkit-details-marker {
+  display: none;
+}
+
+.alert-detail summary span {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.alert-detail[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.alert-detail .detail-body {
+  padding: 12px;
 }
 
 .day-item-oncall {

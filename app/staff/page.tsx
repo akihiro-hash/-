@@ -47,14 +47,17 @@ export default async function StaffPage() {
       </header>
 
       {staffAlerts.length > 0 && (
-        <section className="card alert">
-          <h2>確認が必要な勤怠があります</h2>
-          <div className="day-list compact-list">
-            {staffAlerts.slice(0, 5).map((message) => (
-              <div className="day-item" key={message}>{message}</div>
+        <details className="card alert alert-detail">
+          <summary>
+            <strong>アラートが {staffAlerts.length}件あります。</strong>
+            <span>確認する</span>
+          </summary>
+          <div className="detail-body">
+            {staffAlerts.map((message) => (
+              <span key={message}>{message}</span>
             ))}
           </div>
-        </section>
+        </details>
       )}
 
       <section className="card stack" id="staff-today">
