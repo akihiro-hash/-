@@ -19,16 +19,19 @@ export function ActionButton({ endpoint, children, className = "secondary", conf
   async function submit() {
     if (confirmMessage && !window.confirm(confirmMessage)) return;
     setPending(true);
+    if (successMessage) {
+      setMessage(successMessage);
+    }
     const response = await fetch(endpoint, { method: "POST" });
     if (!response.ok) {
+      setMessage(null);
       const payload = await response.json().catch(() => null);
       alert(payload?.error ?? "処理に失敗しました。");
     } else if (successMessage) {
-      setMessage(successMessage);
       window.setTimeout(() => {
         setMessage(null);
         router.refresh();
-      }, 1600);
+      }, 900);
       setPending(false);
       return;
     }

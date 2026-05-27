@@ -418,6 +418,26 @@ export async function readDb(): Promise<DbSnapshot> {
   };
 }
 
+export async function getUserMonthAttendanceRecords(userId: string, month: string) {
+  await ensureInitialData();
+  const { start, next } = monthBounds(month);
+  const records = await prisma.attendanceRecord.findMany({
+    where: { userId, workDate: { gte: start, lt: next } },
+    orderBy: { workDate: "asc" }
+  });
+  return records.map(serializeRecord);
+}
+
+export async function getRecentLeaveRequests(userId: string, take = 8) {
+  await ensureInitialData();
+  const requests = await prisma.paidLeaveRequest.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    take
+  });
+  return requests.map(serializeLeaveRequest);
+}
+
 export async function findUserByEmail(email: string) {
   await ensureInitialData();
   const user = await prisma.user.findUnique({ where: { email }, include: { workSettings: true } });
@@ -808,12 +828,22 @@ export async function getStandardWorkForDate(userId: string, targetDate: string)
 }
 
 export async function getStandardWorkMap(userId: string, month: string, days: number) {
-  const entries = await Promise.all(
-    Array.from({ length: days }, async (_, index) => {
+  const user = await findUserById(userId);
+  if (!user) {
+    return Object.fromEntries(
+      Array.from({ length: days }, (_, index) => {
+        const date = `${month}-${String(index + 1).padStart(2, "0")}`;
+        return [date, { start: "09:00", end: "18:00", label: "9:00-18:00" }];
+      })
+    );
+  }
+  const entries = Array.from({ length: days }, (_, index) => {
       const date = `${month}-${String(index + 1).padStart(2, "0")}`;
-      return [date, await getStandardWorkForDate(userId, date)] as const;
-    })
-  );
+      const setting = effectiveWorkSetting(user, date) as User | WorkSetting;
+      const start = "standardStartTime" in setting ? setting.standardStartTime : "09:00";
+      const end = "standardEndTime" in setting ? setting.standardEndTime : inferStandardEnd(start, setting.weeklyWorkDays, setting.weeklyWorkHours);
+      return [date, { start, end, label: `${trimTime(start)}-${trimTime(end)}` }] as const;
+    });
   return Object.fromEntries(entries);
 }
 

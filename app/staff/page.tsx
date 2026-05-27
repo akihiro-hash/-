@@ -5,7 +5,7 @@ import { LeaveHistoryModal } from "@/components/LeaveHistoryModal";
 import { StaffQuickNav } from "@/components/StaffQuickNav";
 import { DailyOperationsForm, DirectAttendanceCorrectionForm, PaidLeaveForm } from "@/components/StaffForms";
 import { requireUser } from "@/lib/auth";
-import { getAttendanceRecord, getStandardWorkForDate, getStandardWorkMap, getTodayAttendance, leaveSummary, readDb } from "@/lib/json-db";
+import { getAttendanceRecord, getRecentLeaveRequests, getStandardWorkForDate, getStandardWorkMap, getTodayAttendance, getUserMonthAttendanceRecords, leaveSummary } from "@/lib/json-db";
 import { addDays, formatDate, formatTime, minutesToHours, monthRange, toJstDateKey } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -24,18 +24,20 @@ export default async function StaffPage({ searchParams }: Props) {
   const user = await requireUser();
   if (user.role === "ADMIN") redirect("/admin");
   const params = await searchParams;
-  const today = await getTodayAttendance(user.id);
-  const yesterday = await getAttendanceRecord(user.id, toJstDateKey(addDays(new Date(), -1)));
-  const leave = await leaveSummary(user.id);
   const currentMonth = toJstDateKey().slice(0, 7);
   const month = params.month ?? currentMonth;
   const { days } = monthRange(month);
   const previousMonth = shiftMonth(month, -1);
   const nextMonth = shiftMonth(month, 1);
-  const db = await readDb();
-  const monthRecords = db.attendanceRecords.filter((record) => record.userId === user.id && record.workDate.startsWith(month));
-  const todayStandardWork = await getStandardWorkForDate(user.id, toJstDateKey());
-  const standardWorkByDate = await getStandardWorkMap(user.id, month, days);
+  const [today, yesterday, leave, monthRecords, todayStandardWork, standardWorkByDate, requests] = await Promise.all([
+    getTodayAttendance(user.id),
+    getAttendanceRecord(user.id, toJstDateKey(addDays(new Date(), -1))),
+    leaveSummary(user.id),
+    getUserMonthAttendanceRecords(user.id, month),
+    getStandardWorkForDate(user.id, toJstDateKey()),
+    getStandardWorkMap(user.id, month, days),
+    getRecentLeaveRequests(user.id)
+  ]);
   const recordMap = new Map(monthRecords.map((record) => [record.workDate, record]));
   const registeredDates = monthRecords
     .filter((record) => record.clockInAt || record.clockOutAt)
@@ -43,7 +45,6 @@ export default async function StaffPage({ searchParams }: Props) {
   const dayOperations = Object.fromEntries(
     monthRecords.map((record) => [record.workDate, { onCall: record.onCall, emergencyVisits: record.emergencyVisits }])
   );
-  const requests = db.paidLeaveRequests.filter((request) => request.userId === user.id).slice(-8).reverse();
 
   return (
     <main className="staff-shell">
