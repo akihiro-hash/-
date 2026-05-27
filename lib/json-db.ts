@@ -107,6 +107,11 @@ export type AuditLog = {
   createdAt: string;
 };
 
+export type WorkingWeekdaySetting = {
+  effectiveFrom: string;
+  weekdays: number[];
+};
+
 type DbSnapshot = {
   users: User[];
   attendanceRecords: AttendanceRecord[];
@@ -404,6 +409,36 @@ function serializeAuditLog(log: any): AuditLog {
   };
 }
 
+function parseAuditDetails(detailsJson?: string | null) {
+  try {
+    return JSON.parse(detailsJson || "{}") as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+export function normalizeWorkingWeekdays(values: unknown[]) {
+  const weekdays = values
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value >= 0 && value <= 6);
+  return [...new Set(weekdays)].sort((a, b) => a - b);
+}
+
+function defaultWorkingWeekdays(weeklyWorkDays: number) {
+  if (weeklyWorkDays >= 5) return [1, 2, 3, 4, 5];
+  if (weeklyWorkDays <= 0) return [];
+  return [1, 2, 3, 4, 5].slice(0, Math.max(1, Math.min(5, weeklyWorkDays)));
+}
+
+export function isScheduledWorkday(user: Pick<User, "id" | "weeklyWorkDays">, dateKey: string, settings: Map<string, WorkingWeekdaySetting[]>) {
+  const weekday = new Date(`${dateKey}T00:00:00+09:00`).getDay();
+  const candidates = (settings.get(user.id) ?? [])
+    .filter((setting) => setting.effectiveFrom <= dateKey)
+    .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
+  const weekdays = candidates[0]?.weekdays?.length ? candidates[0].weekdays : defaultWorkingWeekdays(user.weeklyWorkDays);
+  return weekdays.includes(weekday);
+}
+
 async function ensureInitialData() {
   initialDataReady ??= ensureInitialDataOnce();
   return initialDataReady;
@@ -495,8 +530,10 @@ export async function findLoginUserByEmail(email: string) {
     name: string;
     department: string;
     jobTitle: string | null;
+    weeklyWorkDays: number;
+    weeklyWorkHours: number;
   }>>`
-    SELECT "id", "role", "passwordHash", "name", "department", "jobTitle"
+    SELECT "id", "role", "passwordHash", "name", "department", "jobTitle", "weeklyWorkDays", "weeklyWorkHours"
     FROM "User"
     WHERE "email" = ${email}
     LIMIT 1
@@ -585,6 +622,28 @@ export async function getRecentAuditLogs(take = 30) {
     take
   });
   return logs.map(serializeAuditLog);
+}
+
+export async function getWorkingWeekdaySettings(userIds: string[]) {
+  if (userIds.length === 0) return new Map<string, WorkingWeekdaySetting[]>();
+  const logs = await prisma.auditLog.findMany({
+    where: {
+      action: "STAFF_SETTINGS_UPDATE",
+      entityType: "USER",
+      entityId: { in: userIds }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+  const settings = new Map<string, WorkingWeekdaySetting[]>();
+  for (const log of logs) {
+    if (!log.entityId) continue;
+    const details = parseAuditDetails(log.detailsJson);
+    const weekdays = Array.isArray(details.workingWeekdays) ? normalizeWorkingWeekdays(details.workingWeekdays) : [];
+    if (weekdays.length === 0) continue;
+    const effectiveFrom = typeof details.effectiveFrom === "string" ? details.effectiveFrom : toJstDateKey(log.createdAt);
+    settings.set(log.entityId, [...(settings.get(log.entityId) ?? []), { effectiveFrom, weekdays }]);
+  }
+  return settings;
 }
 
 export async function isMonthClosed(month: string) {

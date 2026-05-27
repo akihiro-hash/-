@@ -12,6 +12,8 @@ type SessionPayload = {
   name?: string;
   department?: string;
   jobTitle?: string;
+  weeklyWorkDays?: number;
+  weeklyWorkHours?: number;
 };
 
 function secret() {
@@ -64,8 +66,8 @@ export async function getCurrentUser() {
       role: session.role,
       department: session.department,
       hireDate: "",
-      weeklyWorkDays: 5,
-      weeklyWorkHours: 40,
+      weeklyWorkDays: session.weeklyWorkDays ?? 5,
+      weeklyWorkHours: session.weeklyWorkHours ?? 40,
       employmentStatus: "ACTIVE" as const,
       jobTitle: session.jobTitle ?? "その他",
       workSettings: []
@@ -96,6 +98,8 @@ export async function setSession(user: {
   name?: string;
   department?: string;
   jobTitle?: string | null;
+  weeklyWorkDays?: number;
+  weeklyWorkHours?: number;
 }) {
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, createSessionToken({
@@ -103,7 +107,9 @@ export async function setSession(user: {
     role: user.role,
     name: user.name,
     department: user.department,
-    jobTitle: user.jobTitle ?? undefined
+    jobTitle: user.jobTitle ?? undefined,
+    weeklyWorkDays: user.weeklyWorkDays,
+    weeklyWorkHours: user.weeklyWorkHours
   }), {
     httpOnly: true,
     sameSite: "lax",

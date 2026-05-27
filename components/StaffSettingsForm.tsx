@@ -36,6 +36,14 @@ function calculateWeeklyHours(start: string, end: string, weeklyDays: number) {
 }
 
 export function StaffSettingsForm({ users, jobTitles }: Props) {
+  function syncWeeklyDaysFromWeekdays(form: HTMLFormElement) {
+    const weeklyDays = form.elements.namedItem("weeklyWorkDays") as HTMLInputElement | null;
+    if (!weeklyDays) return;
+    const checked = form.querySelectorAll<HTMLInputElement>('input[name="workingWeekdays"]:checked').length;
+    weeklyDays.value = String(Math.max(1, checked));
+    syncEndTime(form);
+  }
+
   function syncEndTime(form: HTMLFormElement) {
     const weeklyDays = form.elements.namedItem("weeklyWorkDays") as HTMLInputElement | null;
     const weeklyHours = form.elements.namedItem("weeklyWorkHours") as HTMLInputElement | null;
@@ -83,6 +91,29 @@ export function StaffSettingsForm({ users, jobTitles }: Props) {
           <option value="INACTIVE">休職・退職</option>
         </select>
       </label>
+      <fieldset className="weekday-picker">
+        <legend>勤務曜日</legend>
+        {[
+          ["1", "月"],
+          ["2", "火"],
+          ["3", "水"],
+          ["4", "木"],
+          ["5", "金"],
+          ["6", "土"],
+          ["0", "日"]
+        ].map(([value, label]) => (
+          <label className="check-row weekday-check" key={value}>
+            <input
+              name="workingWeekdays"
+              type="checkbox"
+              value={value}
+              defaultChecked={["1", "2", "3", "4", "5"].includes(value)}
+              onChange={(event) => event.currentTarget.form && syncWeeklyDaysFromWeekdays(event.currentTarget.form)}
+            />
+            <span>{label}</span>
+          </label>
+        ))}
+      </fieldset>
       <label>
         週所定日数
         <input name="weeklyWorkDays" type="number" min="1" max="7" step="1" defaultValue="5" required onChange={(event) => event.currentTarget.form && syncEndTime(event.currentTarget.form)} />

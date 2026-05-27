@@ -464,6 +464,36 @@ textarea {
   height: 20px;
 }
 
+.weekday-picker {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: white;
+}
+
+.weekday-picker legend {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.weekday-check {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.weekday-check input {
+  width: 18px;
+  height: 18px;
+}
+
 .admin-check {
   align-self: end;
   min-height: 42px;

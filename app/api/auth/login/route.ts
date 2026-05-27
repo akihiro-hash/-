@@ -43,7 +43,9 @@ export async function POST(request: Request) {
     role: user.role as "STAFF" | "ADMIN",
     name: user.name,
     department: user.department,
-    jobTitle: user.jobTitle
+    jobTitle: user.jobTitle,
+    weeklyWorkDays: user.weeklyWorkDays,
+    weeklyWorkHours: user.weeklyWorkHours
   });
   return NextResponse.redirect(new URL(user.role === "ADMIN" ? "/admin" : "/staff", request.url), 303);
 }

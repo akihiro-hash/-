@@ -2,7 +2,7 @@ import { AdminDecisionButtons, PrintButton } from "@/components/AdminActions";
 import { AdminHelpModal } from "@/components/AdminHelpModal";
 import { StaffSettingsForm } from "@/components/StaffSettingsForm";
 import { requireAdmin } from "@/lib/auth";
-import { getMonthData, leaveSummary } from "@/lib/json-db";
+import { getMonthData, getWorkingWeekdaySettings, isScheduledWorkday, leaveSummary } from "@/lib/json-db";
 import { formatTime, minutesToHours, monthRange, toJstDateKey } from "@/lib/time";
 import { getJpHolidayName } from "@/lib/jp-holidays";
 
@@ -78,7 +78,10 @@ export default async function AdminPage({ searchParams }: Props) {
   const month = params.month ?? toJstDateKey().slice(0, 7);
   const { days } = monthRange(month);
   const { users, records, leaves, correctionRequests, leaveRequests, correctionLogs, leaveRequestHistory, paidLeaveGrants, auditLogs, monthClosed } = await getMonthData(month);
-  const expiringSummaries = await Promise.all(users.map(async (user) => ({ user, summary: await leaveSummary(user.id) })));
+  const [expiringSummaries, workingWeekdaySettings] = await Promise.all([
+    Promise.all(users.map(async (user) => ({ user, summary: await leaveSummary(user.id) }))),
+    getWorkingWeekdaySettings(users.map((user) => user.id))
+  ]);
   const userName = new Map(users.map((user) => [user.id, user.name]));
   const recordMap = new Map(records.map((record) => [`${record.userId}:${record.workDate}`, record]));
   const todayKey = toJstDateKey();
@@ -96,8 +99,7 @@ export default async function AdminPage({ searchParams }: Props) {
     Array.from({ length: days }, (_, index) => {
       const dateKey = `${month}-${String(index + 1).padStart(2, "0")}`;
       if (dateKey >= todayKey) return null;
-      const weekday = new Date(`${dateKey}T00:00:00+09:00`).getDay();
-      if (weekday === 0 || weekday === 6 || getJpHolidayName(dateKey)) return null;
+      if (!isScheduledWorkday(user, dateKey, workingWeekdaySettings) || getJpHolidayName(dateKey)) return null;
       const record = recordMap.get(`${user.id}:${dateKey}`);
       if (!record) return { user, dateKey, message: "勤怠未登録" };
       if (record.clockInAt && !record.clockOutAt) return { user, dateKey, message: "退勤漏れ" };

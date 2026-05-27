@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
-import { createAuditLog, updateStaffSettings } from "@/lib/json-db";
+import { createAuditLog, normalizeWorkingWeekdays, updateStaffSettings } from "@/lib/json-db";
 
 export async function POST(request: Request) {
   const admin = await requireAdmin();
@@ -22,7 +22,11 @@ export async function POST(request: Request) {
     action: "STAFF_SETTINGS_UPDATE",
     entityType: "USER",
     entityId: userId,
-    details: { effectiveFrom: String(form.get("effectiveFrom") ?? ""), employmentStatus: String(form.get("employmentStatus") ?? "ACTIVE") }
+    details: {
+      effectiveFrom: String(form.get("effectiveFrom") ?? ""),
+      employmentStatus: String(form.get("employmentStatus") ?? "ACTIVE"),
+      workingWeekdays: normalizeWorkingWeekdays(form.getAll("workingWeekdays"))
+    }
   });
   return NextResponse.redirect(new URL("/admin?saved=staff-settings", request.url), 303);
 }
