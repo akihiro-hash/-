@@ -303,6 +303,23 @@ function serializeRecord(record: any): AttendanceRecord {
   };
 }
 
+function emptyAttendanceRecord(userId: string, workDate: string): AttendanceRecord {
+  return {
+    id: "",
+    userId,
+    workDate,
+    clockInAt: null,
+    clockOutAt: null,
+    totalBreakMins: 0,
+    workMins: 0,
+    overtimeMins: 0,
+    nightMins: 0,
+    status: "PENDING",
+    onCall: false,
+    emergencyVisits: 0
+  };
+}
+
 function serializeGrant(grant: any): PaidLeaveGrant {
   return {
     id: grant.id,
@@ -449,8 +466,15 @@ export async function findUserByEmail(email: string) {
 }
 
 export async function findLoginUserByEmail(email: string) {
-  const users = await prisma.$queryRaw<Array<{ id: string; role: string; passwordHash: string }>>`
-    SELECT "id", "role", "passwordHash"
+  const users = await prisma.$queryRaw<Array<{
+    id: string;
+    role: string;
+    passwordHash: string;
+    name: string;
+    department: string;
+    jobTitle: string | null;
+  }>>`
+    SELECT "id", "role", "passwordHash", "name", "department", "jobTitle"
     FROM "User"
     WHERE "email" = ${email}
     LIMIT 1
@@ -548,6 +572,13 @@ export async function getAttendanceRecord(userId: string, workDate: string) {
     create: { userId, workDate: parseJstDate(workDate) }
   });
   return serializeRecord(record);
+}
+
+export async function findAttendanceRecord(userId: string, workDate: string) {
+  const record = await prisma.attendanceRecord.findUnique({
+    where: { userId_workDate: { userId, workDate: parseJstDate(workDate) } }
+  });
+  return record ? serializeRecord(record) : emptyAttendanceRecord(userId, workDate);
 }
 
 export async function updateAttendance(userId: string, action: "CLOCK_IN" | "CLOCK_OUT") {

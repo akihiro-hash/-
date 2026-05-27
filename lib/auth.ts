@@ -9,6 +9,9 @@ type SessionPayload = {
   userId: string;
   role: "STAFF" | "ADMIN";
   exp: number;
+  name?: string;
+  department?: string;
+  jobTitle?: string;
 };
 
 function secret() {
@@ -53,6 +56,21 @@ export async function getCurrentUser() {
     return null;
   }
   if (!session) return null;
+  if (session.name && session.department) {
+    return {
+      id: session.userId,
+      name: session.name,
+      email: "",
+      role: session.role,
+      department: session.department,
+      hireDate: "",
+      weeklyWorkDays: 5,
+      weeklyWorkHours: 40,
+      employmentStatus: "ACTIVE" as const,
+      jobTitle: session.jobTitle ?? "その他",
+      workSettings: []
+    };
+  }
   try {
     return await findUserById(session.userId);
   } catch {
@@ -72,9 +90,21 @@ export async function requireAdmin() {
   return user;
 }
 
-export async function setSession(userId: string, role: "STAFF" | "ADMIN") {
+export async function setSession(user: {
+  id: string;
+  role: "STAFF" | "ADMIN";
+  name?: string;
+  department?: string;
+  jobTitle?: string | null;
+}) {
   const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, createSessionToken({ userId, role }), {
+  cookieStore.set(COOKIE_NAME, createSessionToken({
+    userId: user.id,
+    role: user.role,
+    name: user.name,
+    department: user.department,
+    jobTitle: user.jobTitle ?? undefined
+  }), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

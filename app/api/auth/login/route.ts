@@ -38,6 +38,12 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL(`${retryPath}?error=role`, request.url), 303);
   }
 
-  await setSession(user.id, user.role as "STAFF" | "ADMIN");
+  await setSession({
+    id: user.id,
+    role: user.role as "STAFF" | "ADMIN",
+    name: user.name,
+    department: user.department,
+    jobTitle: user.jobTitle
+  });
   return NextResponse.redirect(new URL(user.role === "ADMIN" ? "/admin" : "/staff", request.url), 303);
 }

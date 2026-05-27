@@ -3,7 +3,7 @@ import { ActionButton } from "@/components/ActionButton";
 import { StaffQuickNav } from "@/components/StaffQuickNav";
 import { DailyOperationsForm } from "@/components/StaffForms";
 import { requireUser } from "@/lib/auth";
-import { getAttendanceRecord, getStandardWorkForDate, getTodayAttendance } from "@/lib/json-db";
+import { findAttendanceRecord, getStandardWorkForDate } from "@/lib/json-db";
 import { addDays, formatTime, minutesToHours, toJstDateKey } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +13,10 @@ export default async function StaffPage() {
   if (user.role === "ADMIN") redirect("/admin");
 
   const todayKey = toJstDateKey();
+  const yesterdayKey = toJstDateKey(addDays(new Date(), -1));
   const [today, yesterday, todayStandardWork] = await Promise.all([
-    getTodayAttendance(user.id),
-    getAttendanceRecord(user.id, toJstDateKey(addDays(new Date(), -1))),
+    findAttendanceRecord(user.id, todayKey),
+    findAttendanceRecord(user.id, yesterdayKey),
     getStandardWorkForDate(user.id, todayKey)
   ]);
 
