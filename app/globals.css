@@ -76,6 +76,11 @@ a {
   color: var(--primary);
 }
 
+.staff-menu-grid {
+  display: grid;
+  gap: 10px;
+}
+
 .eyebrow {
   margin: 0 0 8px;
   color: var(--primary);
