@@ -155,6 +155,7 @@ export default async function AdminPage({ searchParams }: Props) {
           </label>
           <button className="primary">表示</button>
           <a className="secondary" href={`/api/admin/export.csv?month=${month}`}>CSV出力</a>
+          <a className="secondary" href={`/api/admin/export.xls?month=${month}`}>Excel出力</a>
           <PrintButton />
           <AdminHelpModal />
         </form>
