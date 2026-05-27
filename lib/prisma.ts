@@ -8,12 +8,14 @@ export const prisma =
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"]
   });
 
-prisma.$use(async (params, next) => {
-  if (params.model) {
-    await ensureDatabaseSchema();
-  }
-  return next(params);
-});
+if (process.env.NODE_ENV !== "production" || process.env.AUTO_SCHEMA_SYNC === "true") {
+  prisma.$use(async (params, next) => {
+    if (params.model) {
+      await ensureDatabaseSchema();
+    }
+    return next(params);
+  });
+}
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
