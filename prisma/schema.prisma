@@ -18,6 +18,7 @@ model User {
   weeklyWorkDays    Int
   weeklyWorkHours   Float
   employmentStatus  String             @default("ACTIVE")
+  retirementDate    DateTime?
   jobTitle          String             @default("その他")
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt

@@ -38,6 +38,10 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL(`${retryPath}?error=role`, request.url), 303);
   }
 
+  if (user.role === "STAFF" && user.employmentStatus !== "ACTIVE") {
+    return NextResponse.redirect(new URL(`${retryPath}?error=inactive`, request.url), 303);
+  }
+
   await setSession({
     id: user.id,
     role: user.role as "STAFF" | "ADMIN",

@@ -69,6 +69,7 @@ export async function getCurrentUser() {
       weeklyWorkDays: session.weeklyWorkDays ?? 5,
       weeklyWorkHours: session.weeklyWorkHours ?? 40,
       employmentStatus: "ACTIVE" as const,
+      retirementDate: null,
       jobTitle: session.jobTitle ?? "その他",
       workSettings: []
     };

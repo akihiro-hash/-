@@ -78,7 +78,7 @@ export default async function AdminPage({ searchParams }: Props) {
   const params = await searchParams;
   const month = params.month ?? toJstDateKey().slice(0, 7);
   const { days } = monthRange(month);
-  const { users, records, leaves, correctionRequests, leaveRequests, correctionLogs, leaveRequestHistory, paidLeaveGrants, auditLogs, monthClosed } = await getMonthData(month);
+  const { users, allStaffUsers, records, leaves, correctionRequests, leaveRequests, correctionLogs, leaveRequestHistory, paidLeaveGrants, auditLogs, monthClosed } = await getMonthData(month);
   const [expiringSummaries, workingWeekdaySettings] = await Promise.all([
     Promise.all(users.map(async (user) => ({ user, summary: await leaveSummary(user.id) }))),
     getWorkingWeekdaySettings(users.map((user) => user.id))
@@ -282,6 +282,12 @@ export default async function AdminPage({ searchParams }: Props) {
                     {user.name}
                     <br />
                     <span className="muted">{user.department} / {user.jobTitle ?? "その他"}</span>
+                    {user.employmentStatus !== "ACTIVE" && (
+                      <>
+                        <br />
+                        <span className="muted">退職日 {user.retirementDate ?? "-"}</span>
+                      </>
+                    )}
                     {(overtimeByUser.get(user.id) ?? 0) >= 15 * 60 && (
                       <span className="overtime-alert-text"> 残{minutesToHours(overtimeByUser.get(user.id) ?? 0)}h</span>
                     )}
@@ -619,7 +625,7 @@ export default async function AdminPage({ searchParams }: Props) {
           <summary className="accordion-summary">既存スタッフの勤務設定を変更</summary>
           <div className="accordion-body">
             <p className="muted">パートさんなど、週の所定労働日数・時間を適用開始日つきで設定します。有給の自動付与は付与日時点の設定で計算します。</p>
-            <StaffSettingsForm users={users.map((user) => ({ id: user.id, name: user.name }))} jobTitles={jobTitles} />
+            <StaffSettingsForm users={allStaffUsers.map((user) => ({ id: user.id, name: user.employmentStatus === "ACTIVE" ? user.name : `${user.name}（退職）` }))} jobTitles={jobTitles} />
           </div>
         </details>
 

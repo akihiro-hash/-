@@ -135,7 +135,7 @@ export async function GET(request: Request) {
         [],
         [`スタッフ別詳細: ${user.name}`],
         ["基本情報"],
-        ["部署", "職種", "雇用形態", "氏名", "入社日", "在籍状態", "週所定日数", "週所定時間", "勤務曜日"],
+        ["部署", "職種", "雇用形態", "氏名", "入社日", "在籍状態", "退職日", "週所定日数", "週所定時間", "勤務曜日"],
         [
         user.department,
         user.jobTitle ?? "",
@@ -143,6 +143,7 @@ export async function GET(request: Request) {
         user.name,
         user.hireDate,
         user.employmentStatus === "ACTIVE" ? "在籍中" : "休職・退職",
+        user.retirementDate ?? "",
         user.weeklyWorkDays,
         user.weeklyWorkHours,
         latestWeekdays.map((day) => weekdayLabels[day]).join("・")

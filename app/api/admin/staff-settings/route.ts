@@ -15,7 +15,8 @@ export async function POST(request: Request) {
     standardEndTime: String(form.get("standardEndTime") ?? "18:00"),
     department: String(form.get("department") ?? ""),
     jobTitle: String(form.get("jobTitle") ?? "その他"),
-    employmentStatus: String(form.get("employmentStatus") ?? "ACTIVE") === "INACTIVE" ? "INACTIVE" : "ACTIVE"
+    employmentStatus: String(form.get("employmentStatus") ?? "ACTIVE") === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+    retirementDate: String(form.get("retirementDate") ?? "")
   });
   await createAuditLog({
     actorId: admin.id,
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
     details: {
       effectiveFrom: String(form.get("effectiveFrom") ?? ""),
       employmentStatus: String(form.get("employmentStatus") ?? "ACTIVE"),
+      retirementDate: String(form.get("retirementDate") ?? ""),
       employmentType: String(form.get("employmentType") || "正社員"),
       workingWeekdays: normalizeWorkingWeekdays(form.getAll("workingWeekdays"))
     }

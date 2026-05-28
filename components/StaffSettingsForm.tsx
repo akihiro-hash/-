@@ -92,6 +92,10 @@ export function StaffSettingsForm({ users, jobTitles }: Props) {
         </select>
       </label>
       <label>
+        退職日
+        <input name="retirementDate" type="date" />
+      </label>
+      <label>
         雇用形態
         <select name="employmentType" defaultValue="正社員">
           <option value="正社員">正社員</option>

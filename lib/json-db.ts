@@ -13,6 +13,7 @@ export type User = {
   weeklyWorkDays: number;
   weeklyWorkHours: number;
   employmentStatus: "ACTIVE" | "INACTIVE";
+  retirementDate?: string | null;
   jobTitle?: string;
   workSettings?: WorkSetting[];
 };
@@ -149,10 +150,12 @@ async function createDatabaseSchema() {
       "weeklyWorkDays" INTEGER NOT NULL,
       "weeklyWorkHours" DOUBLE PRECISION NOT NULL,
       "employmentStatus" TEXT NOT NULL DEFAULT 'ACTIVE',
+      "retirementDate" TIMESTAMP,
       "jobTitle" TEXT NOT NULL DEFAULT 'その他',
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "retirementDate" TIMESTAMP`,
     `CREATE TABLE IF NOT EXISTS "WorkSetting" (
       "id" TEXT PRIMARY KEY,
       "userId" TEXT NOT NULL,
@@ -289,6 +292,7 @@ function serializeUser(user: any): User {
     role: user.role as "STAFF" | "ADMIN",
     employmentStatus: user.employmentStatus as "ACTIVE" | "INACTIVE",
     hireDate: dateKey(user.hireDate),
+    retirementDate: user.retirementDate ? dateKey(user.retirementDate) : null,
     workSettings: user.workSettings?.map(serializeWorkSetting)
   };
 }
@@ -435,7 +439,8 @@ function defaultWorkingWeekdays(weeklyWorkDays: number) {
   return [1, 2, 3, 4, 5].slice(0, Math.max(1, Math.min(5, weeklyWorkDays)));
 }
 
-export function isScheduledWorkday(user: Pick<User, "id" | "weeklyWorkDays">, dateKey: string, settings: Map<string, WorkingWeekdaySetting[]>) {
+export function isScheduledWorkday(user: Pick<User, "id" | "weeklyWorkDays" | "retirementDate">, dateKey: string, settings: Map<string, WorkingWeekdaySetting[]>) {
+  if (user.retirementDate && dateKey > user.retirementDate) return false;
   const weekday = new Date(`${dateKey}T00:00:00+09:00`).getDay();
   const candidates = (settings.get(user.id) ?? [])
     .filter((setting) => setting.effectiveFrom <= dateKey)
@@ -534,11 +539,13 @@ export async function findLoginUserByEmail(email: string) {
     passwordHash: string;
     name: string;
     department: string;
-    jobTitle: string | null;
-    weeklyWorkDays: number;
-    weeklyWorkHours: number;
+  jobTitle: string | null;
+  weeklyWorkDays: number;
+  weeklyWorkHours: number;
+  employmentStatus: string;
+  retirementDate: Date | null;
   }>>`
-    SELECT "id", "role", "passwordHash", "name", "department", "jobTitle", "weeklyWorkDays", "weeklyWorkHours"
+    SELECT "id", "role", "passwordHash", "name", "department", "jobTitle", "weeklyWorkDays", "weeklyWorkHours", "employmentStatus", "retirementDate"
     FROM "User"
     WHERE "email" = ${email}
     LIMIT 1
@@ -567,10 +574,12 @@ export async function updateStaffSettings(input: {
   department: string;
   jobTitle: string;
   employmentStatus?: "ACTIVE" | "INACTIVE";
+  retirementDate?: string;
 }) {
   const user = await prisma.user.findUnique({ where: { id: input.userId } });
   if (!user) return null;
   const employmentStatus = input.employmentStatus === "INACTIVE" ? "INACTIVE" : "ACTIVE";
+  const retirementDate = employmentStatus === "INACTIVE" && input.retirementDate ? parseJstDate(input.retirementDate) : null;
   const setting = await prisma.workSetting.create({
     data: {
       userId: input.userId,
@@ -591,13 +600,14 @@ export async function updateStaffSettings(input: {
         weeklyWorkHours: setting.weeklyWorkHours,
         department: setting.department,
         jobTitle: setting.jobTitle,
-        employmentStatus
+        employmentStatus,
+        retirementDate
       }
     });
   } else {
     await prisma.user.update({
       where: { id: input.userId },
-      data: { employmentStatus }
+      data: { employmentStatus, retirementDate }
     });
   }
   return findUserById(input.userId);
@@ -975,13 +985,15 @@ async function ensureAutoAnnualPaidLeaveGrants(userId?: string) {
     include: { workSettings: true }
   });
   for (const user of users) {
-    for (const [index, grantDateKey] of annualGrantDateKeys(serializeUser(user)).entries()) {
+    const serializedUser = serializeUser(user);
+    for (const [index, grantDateKey] of annualGrantDateKeys(serializedUser).entries()) {
       if (grantDateKey > today) continue;
+      if (serializedUser.retirementDate && grantDateKey > serializedUser.retirementDate) continue;
       const exists = await prisma.paidLeaveGrant.findFirst({
         where: { userId: user.id, grantDate: parseJstDate(grantDateKey), source: "AUTO", leaveType: "PAID_LEAVE" }
       });
       if (exists) continue;
-      const setting = effectiveWorkSetting(serializeUser(user), grantDateKey);
+      const setting = effectiveWorkSetting(serializedUser, grantDateKey);
       const days = annualGrantDays(setting.weeklyWorkDays, setting.weeklyWorkHours, index);
       if (days <= 0) continue;
       await prisma.paidLeaveGrant.create({
@@ -1132,8 +1144,8 @@ function monthBounds(month: string) {
 export async function getMonthData(month: string) {
   await ensureInitialData();
   const { start, next } = monthBounds(month);
-  const [users, records, leaves, correctionRequests, leaveRequests, correctionLogs, leaveRequestHistory, paidLeaveGrants, auditLogs, monthClosed] = await Promise.all([
-    prisma.user.findMany({ where: { role: "STAFF", employmentStatus: "ACTIVE" }, include: { workSettings: true } }),
+  const [staffUsers, records, leaves, correctionRequests, leaveRequests, correctionLogs, leaveRequestHistory, paidLeaveGrants, auditLogs, monthClosed] = await Promise.all([
+    prisma.user.findMany({ where: { role: "STAFF" }, include: { workSettings: true } }),
     prisma.attendanceRecord.findMany({ where: { workDate: { gte: start, lt: next } } }),
     prisma.paidLeaveRequest.findMany({ where: { startAt: { gte: start, lt: next } } }),
     prisma.correctionRequest.findMany({ where: { status: "PENDING" } }),
@@ -1144,8 +1156,10 @@ export async function getMonthData(month: string) {
     getRecentAuditLogs(40),
     isMonthClosed(month)
   ]);
+  const users = staffUsers.filter((user) => user.employmentStatus === "ACTIVE" || (user.retirementDate && user.retirementDate >= start));
   return {
     users: users.map(serializeUser),
+    allStaffUsers: staffUsers.map(serializeUser),
     records: records.map(serializeRecord),
     leaves: leaves.map(serializeLeaveRequest),
     correctionRequests: correctionRequests.map(serializeCorrectionRequest),

@@ -39,10 +39,12 @@ async function createDatabaseSchema() {
       "weeklyWorkDays" INTEGER NOT NULL,
       "weeklyWorkHours" DOUBLE PRECISION NOT NULL,
       "employmentStatus" TEXT NOT NULL DEFAULT 'ACTIVE',
+      "retirementDate" TIMESTAMP,
       "jobTitle" TEXT NOT NULL DEFAULT 'その他',
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "retirementDate" TIMESTAMP`,
     `CREATE TABLE IF NOT EXISTS "WorkSetting" (
       "id" TEXT PRIMARY KEY,
       "userId" TEXT NOT NULL,

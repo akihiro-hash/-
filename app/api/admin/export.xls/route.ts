@@ -153,8 +153,8 @@ export async function GET(request: Request) {
     const rows = [
       rowXml([{ value: `${user.name} ${month}`, style: "Title" }]),
       rowXml(["基本情報"], "Section"),
-      rowXml(["部署", "職種", "雇用形態", "氏名", "入社日", "在籍状態", "週所定日数", "週所定時間", "勤務曜日"], "Header"),
-      rowXml([user.department, user.jobTitle ?? "", profile?.employmentType ?? "正社員", user.name, user.hireDate, user.employmentStatus === "ACTIVE" ? "在籍中" : "休職・退職", user.weeklyWorkDays, user.weeklyWorkHours, latestWeekdays.map((day) => weekdayLabels[day]).join("・")]),
+      rowXml(["部署", "職種", "雇用形態", "氏名", "入社日", "在籍状態", "退職日", "週所定日数", "週所定時間", "勤務曜日"], "Header"),
+      rowXml([user.department, user.jobTitle ?? "", profile?.employmentType ?? "正社員", user.name, user.hireDate, user.employmentStatus === "ACTIVE" ? "在籍中" : "休職・退職", user.retirementDate ?? "", user.weeklyWorkDays, user.weeklyWorkHours, latestWeekdays.map((day) => weekdayLabels[day]).join("・")]),
       rowXml(["月次サマリー"], "Section"),
       rowXml(["予定勤務日数", "出勤実日数", "有給日数", "振休日数", "代休日数", "欠勤日数", "未打刻/退勤漏れ", "確認用合計", "総勤務時間", "残業目安", "深夜目安", "オンコール平日", "オンコール土日祝", "緊急訪問", "休日出勤"], "Header"),
       rowXml([summary.scheduledDays, summary.attendanceDays, summary.paidLeaveDays, summary.compensatoryDays, summary.substituteDays, summary.absenceDays, summary.missing, `${summary.accountedDays}/${summary.scheduledDays}`, summary.workHours, summary.overtimeHours, summary.nightHours, summary.onCallWeekday, summary.onCallHoliday, summary.emergencyVisits, summary.holidayWork], summary.missing > 0 ? "Alert" : "Default"),
