@@ -87,6 +87,7 @@ async function createDatabaseSchema() {
     )`,
     `ALTER TABLE "BreakRecord" ADD COLUMN IF NOT EXISTS "startAt" TIMESTAMP`,
     `ALTER TABLE "BreakRecord" ADD COLUMN IF NOT EXISTS "endAt" TIMESTAMP`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'BreakRecord' AND column_name = 'breakStartAt') THEN ALTER TABLE "BreakRecord" ALTER COLUMN "breakStartAt" DROP NOT NULL; END IF; END $$`,
     `CREATE TABLE IF NOT EXISTS "CorrectionRequest" (
       "id" TEXT PRIMARY KEY,
       "userId" TEXT NOT NULL,
@@ -161,6 +162,8 @@ async function createDatabaseSchema() {
     `ALTER TABLE "PaidLeaveUsage" ADD COLUMN IF NOT EXISTS "paidLeaveGrantId" TEXT`,
     `ALTER TABLE "PaidLeaveUsage" ADD COLUMN IF NOT EXISTS "paidLeaveRequestId" TEXT`,
     `ALTER TABLE "PaidLeaveUsage" ADD COLUMN IF NOT EXISTS "usedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'PaidLeaveUsage' AND column_name = 'requestId') THEN ALTER TABLE "PaidLeaveUsage" ALTER COLUMN "requestId" DROP NOT NULL; END IF; END $$`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'PaidLeaveUsage' AND column_name = 'grantId') THEN ALTER TABLE "PaidLeaveUsage" ALTER COLUMN "grantId" DROP NOT NULL; END IF; END $$`,
     `CREATE TABLE IF NOT EXISTS "AuditLog" (
       "id" TEXT PRIMARY KEY,
       "actorId" TEXT,
@@ -173,7 +176,11 @@ async function createDatabaseSchema() {
     `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "actorId" TEXT`,
     `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "entityType" TEXT NOT NULL DEFAULT ''`,
     `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "entityId" TEXT`,
-    `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "detailsJson" TEXT NOT NULL DEFAULT '{}'`
+    `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "detailsJson" TEXT NOT NULL DEFAULT '{}'`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'AuditLog' AND column_name = 'userId') THEN ALTER TABLE "AuditLog" ALTER COLUMN "userId" DROP NOT NULL; END IF; END $$`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'AuditLog' AND column_name = 'targetType') THEN ALTER TABLE "AuditLog" ALTER COLUMN "targetType" DROP NOT NULL; END IF; END $$`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'AuditLog' AND column_name = 'targetId') THEN ALTER TABLE "AuditLog" ALTER COLUMN "targetId" DROP NOT NULL; END IF; END $$`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'AuditLog' AND column_name = 'payload') THEN ALTER TABLE "AuditLog" ALTER COLUMN "payload" DROP NOT NULL; END IF; END $$`
   ];
 
   for (const statement of statements) {

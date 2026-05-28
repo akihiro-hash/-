@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { ensureInitialData } from "@/lib/json-db";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export async function GET() {
   };
 
   try {
+    await ensureInitialData();
     await prisma.user.count();
     status.database = "ok";
   } catch (error) {

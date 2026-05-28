@@ -183,20 +183,26 @@ async function createDatabaseSchema() {
       "status" TEXT NOT NULL DEFAULT 'PENDING',
       "onCall" BOOLEAN NOT NULL DEFAULT false,
       "emergencyVisits" INTEGER NOT NULL DEFAULT 0,
+      "note" TEXT,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "AttendanceRecord" ADD COLUMN IF NOT EXISTS "note" TEXT`,
     `CREATE UNIQUE INDEX IF NOT EXISTS "AttendanceRecord_userId_workDate_key" ON "AttendanceRecord" ("userId", "workDate")`,
     `CREATE TABLE IF NOT EXISTS "BreakRecord" (
       "id" TEXT PRIMARY KEY,
       "attendanceRecordId" TEXT NOT NULL,
-      "breakStartAt" TIMESTAMP NOT NULL,
-      "breakEndAt" TIMESTAMP,
+      "startAt" TIMESTAMP,
+      "endAt" TIMESTAMP,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "BreakRecord" ADD COLUMN IF NOT EXISTS "startAt" TIMESTAMP`,
+    `ALTER TABLE "BreakRecord" ADD COLUMN IF NOT EXISTS "endAt" TIMESTAMP`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'BreakRecord' AND column_name = 'breakStartAt') THEN ALTER TABLE "BreakRecord" ALTER COLUMN "breakStartAt" DROP NOT NULL; END IF; END $$`,
     `CREATE TABLE IF NOT EXISTS "CorrectionRequest" (
       "id" TEXT PRIMARY KEY,
       "userId" TEXT NOT NULL,
+      "attendanceRecordId" TEXT,
       "targetDate" TIMESTAMP NOT NULL,
       "requestedClockInAt" TIMESTAMP,
       "requestedClockOutAt" TIMESTAMP,
@@ -204,9 +210,12 @@ async function createDatabaseSchema() {
       "status" TEXT NOT NULL DEFAULT 'PENDING',
       "approverId" TEXT,
       "reviewedAt" TIMESTAMP,
+      "reviewerNote" TEXT,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "CorrectionRequest" ADD COLUMN IF NOT EXISTS "attendanceRecordId" TEXT`,
+    `ALTER TABLE "CorrectionRequest" ADD COLUMN IF NOT EXISTS "reviewerNote" TEXT`,
     `CREATE TABLE IF NOT EXISTS "CorrectionLog" (
       "id" TEXT PRIMARY KEY,
       "userId" TEXT NOT NULL,
@@ -246,25 +255,45 @@ async function createDatabaseSchema() {
       "status" TEXT NOT NULL DEFAULT 'PENDING',
       "approverId" TEXT,
       "reviewedAt" TIMESTAMP,
+      "reviewerNote" TEXT,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "PaidLeaveRequest" ADD COLUMN IF NOT EXISTS "reviewerNote" TEXT`,
     `CREATE TABLE IF NOT EXISTS "PaidLeaveUsage" (
       "id" TEXT PRIMARY KEY,
-      "requestId" TEXT NOT NULL,
-      "grantId" TEXT NOT NULL,
+      "userId" TEXT,
+      "paidLeaveGrantId" TEXT,
+      "paidLeaveRequestId" TEXT,
+      "requestId" TEXT,
+      "grantId" TEXT,
       "usedMinutes" INTEGER NOT NULL,
+      "usedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE "PaidLeaveUsage" ADD COLUMN IF NOT EXISTS "userId" TEXT`,
+    `ALTER TABLE "PaidLeaveUsage" ADD COLUMN IF NOT EXISTS "paidLeaveGrantId" TEXT`,
+    `ALTER TABLE "PaidLeaveUsage" ADD COLUMN IF NOT EXISTS "paidLeaveRequestId" TEXT`,
+    `ALTER TABLE "PaidLeaveUsage" ADD COLUMN IF NOT EXISTS "usedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'PaidLeaveUsage' AND column_name = 'requestId') THEN ALTER TABLE "PaidLeaveUsage" ALTER COLUMN "requestId" DROP NOT NULL; END IF; END $$`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'PaidLeaveUsage' AND column_name = 'grantId') THEN ALTER TABLE "PaidLeaveUsage" ALTER COLUMN "grantId" DROP NOT NULL; END IF; END $$`,
     `CREATE TABLE IF NOT EXISTS "AuditLog" (
       "id" TEXT PRIMARY KEY,
-      "userId" TEXT NOT NULL,
+      "actorId" TEXT,
       "action" TEXT NOT NULL,
-      "targetType" TEXT NOT NULL,
-      "targetId" TEXT NOT NULL,
-      "payload" JSONB NOT NULL,
+      "entityType" TEXT NOT NULL DEFAULT '',
+      "entityId" TEXT,
+      "detailsJson" TEXT NOT NULL DEFAULT '{}',
       "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`
+    )`,
+    `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "actorId" TEXT`,
+    `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "entityType" TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "entityId" TEXT`,
+    `ALTER TABLE "AuditLog" ADD COLUMN IF NOT EXISTS "detailsJson" TEXT NOT NULL DEFAULT '{}'`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'AuditLog' AND column_name = 'userId') THEN ALTER TABLE "AuditLog" ALTER COLUMN "userId" DROP NOT NULL; END IF; END $$`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'AuditLog' AND column_name = 'targetType') THEN ALTER TABLE "AuditLog" ALTER COLUMN "targetType" DROP NOT NULL; END IF; END $$`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'AuditLog' AND column_name = 'targetId') THEN ALTER TABLE "AuditLog" ALTER COLUMN "targetId" DROP NOT NULL; END IF; END $$`,
+    `DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'AuditLog' AND column_name = 'payload') THEN ALTER TABLE "AuditLog" ALTER COLUMN "payload" DROP NOT NULL; END IF; END $$`
   ];
 
   for (const statement of statements) {
@@ -449,7 +478,7 @@ export function isScheduledWorkday(user: Pick<User, "id" | "weeklyWorkDays" | "r
   return weekdays.includes(weekday);
 }
 
-async function ensureInitialData() {
+export async function ensureInitialData() {
   initialDataReady ??= ensureInitialDataOnce();
   return initialDataReady;
 }
