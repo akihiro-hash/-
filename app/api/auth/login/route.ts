@@ -30,8 +30,11 @@ export async function POST(request: Request) {
   const retryPath = expectedRole === "ADMIN" ? "/admin-login" : expectedRole === "STAFF" ? "/staff-login" : "/login";
 
   try {
-    await ensureInitialData();
-    const user = await findLoginUserByEmail(email);
+    let user = await findLoginUserByEmail(email);
+    if (!user && process.env.NODE_ENV !== "production") {
+      await ensureInitialData();
+      user = await findLoginUserByEmail(email);
+    }
 
     if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
       return NextResponse.redirect(new URL(`${retryPath}?error=1`, request.url), 303);
