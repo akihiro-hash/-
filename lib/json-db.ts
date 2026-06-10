@@ -501,9 +501,7 @@ export async function ensureInitialData() {
 }
 
 async function ensureInitialDataOnce() {
-  if (process.env.NODE_ENV !== "production") {
-    await ensureDatabaseSchema();
-  }
+  await ensureDatabaseSchema();
   const count = await prisma.user.count();
   if (count > 0) return;
   await prisma.user.createMany({
