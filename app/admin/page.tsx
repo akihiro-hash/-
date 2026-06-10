@@ -1,4 +1,5 @@
 import { AdminDecisionButtons, PrintButton } from "@/components/AdminActions";
+import { AdminAccountForm } from "@/components/AdminAccountForm";
 import { AdminHelpModal } from "@/components/AdminHelpModal";
 import { StaffSettingsForm } from "@/components/StaffSettingsForm";
 import { requireAdmin } from "@/lib/auth";
@@ -681,6 +682,8 @@ export default async function AdminPage({ searchParams }: Props) {
             </form>
           </div>
         </details>
+
+        <AdminAccountForm email={admin.email} />
       </section>
     </main>
   );

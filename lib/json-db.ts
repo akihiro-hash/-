@@ -749,6 +749,17 @@ export async function updateUserPassword(userId: string, password: string) {
   });
 }
 
+export async function updateUserEmail(userId: string, email: string) {
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing && existing.id !== userId) {
+    throw new Error("このメールアドレスは既に使われています。");
+  }
+  await prisma.user.update({
+    where: { id: userId },
+    data: { email }
+  });
+}
+
 export async function isMonthClosed(month: string) {
   const closeLog = await prisma.auditLog.findFirst({
     where: { action: "MONTH_CLOSE", entityType: "ATTENDANCE_MONTH", entityId: month },
