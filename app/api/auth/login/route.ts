@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { setSession, verifyPassword } from "@/lib/auth";
-import { findLoginUserByEmail } from "@/lib/json-db";
+import { ensureInitialData, findLoginUserByEmail } from "@/lib/json-db";
 
 export async function GET(request: Request) {
   const loginUrl = new URL("/staff-login", request.url).toString();
@@ -27,29 +27,36 @@ export async function POST(request: Request) {
   const email = String(form.get("email") ?? "");
   const password = String(form.get("password") ?? "");
   const expectedRole = String(form.get("expectedRole") ?? "") as "STAFF" | "ADMIN" | "";
-  const user = await findLoginUserByEmail(email);
   const retryPath = expectedRole === "ADMIN" ? "/admin-login" : expectedRole === "STAFF" ? "/staff-login" : "/login";
 
-  if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
-    return NextResponse.redirect(new URL(`${retryPath}?error=1`, request.url), 303);
-  }
+  try {
+    await ensureInitialData();
+    const user = await findLoginUserByEmail(email);
 
-  if ((expectedRole === "STAFF" || expectedRole === "ADMIN") && user.role !== expectedRole) {
-    return NextResponse.redirect(new URL(`${retryPath}?error=role`, request.url), 303);
-  }
+    if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
+      return NextResponse.redirect(new URL(`${retryPath}?error=1`, request.url), 303);
+    }
 
-  if (user.role === "STAFF" && user.employmentStatus !== "ACTIVE") {
-    return NextResponse.redirect(new URL(`${retryPath}?error=inactive`, request.url), 303);
-  }
+    if ((expectedRole === "STAFF" || expectedRole === "ADMIN") && user.role !== expectedRole) {
+      return NextResponse.redirect(new URL(`${retryPath}?error=role`, request.url), 303);
+    }
 
-  await setSession({
-    id: user.id,
-    role: user.role as "STAFF" | "ADMIN",
-    name: user.name,
-    department: user.department,
-    jobTitle: user.jobTitle,
-    weeklyWorkDays: user.weeklyWorkDays,
-    weeklyWorkHours: user.weeklyWorkHours
-  });
-  return NextResponse.redirect(new URL(user.role === "ADMIN" ? "/admin" : "/staff", request.url), 303);
+    if (user.role === "STAFF" && user.employmentStatus !== "ACTIVE") {
+      return NextResponse.redirect(new URL(`${retryPath}?error=inactive`, request.url), 303);
+    }
+
+    await setSession({
+      id: user.id,
+      role: user.role as "STAFF" | "ADMIN",
+      name: user.name,
+      department: user.department,
+      jobTitle: user.jobTitle,
+      weeklyWorkDays: user.weeklyWorkDays,
+      weeklyWorkHours: user.weeklyWorkHours
+    });
+    return NextResponse.redirect(new URL(user.role === "ADMIN" ? "/admin" : "/staff", request.url), 303);
+  } catch (error) {
+    console.error("login failed", error);
+    return NextResponse.redirect(new URL(`${retryPath}?error=server`, request.url), 303);
+  }
 }

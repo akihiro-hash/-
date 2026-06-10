@@ -8,7 +8,9 @@ type Props = {
 
 const errorMessages: Record<string, string> = {
   "1": "メールアドレスまたはパスワードが違います。",
-  role: "この入口ではログインできないアカウントです。"
+  role: "この入口ではログインできないアカウントです。",
+  inactive: "このスタッフアカウントは現在ログインできない状態です。",
+  server: "サーバー側でログインに失敗しました。少し待ってからもう一度試してください。"
 };
 
 export function LoginPanel({ title, description, role, defaultEmail, error }: Props) {
