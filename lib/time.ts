@@ -11,8 +11,10 @@ export function parseJstDate(dateKey: string) {
 }
 
 export function getJstWeekday(dateKey: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return 0;
   const [year, month, day] = dateKey.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return Number.isFinite(weekday) ? weekday : 0;
 }
 
 export function monthRange(monthKey: string) {
