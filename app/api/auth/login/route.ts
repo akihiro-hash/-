@@ -41,7 +41,8 @@ export async function POST(request: Request) {
       return NextResponse.redirect(new URL(`${retryPath}?error=role`, request.url), 303);
     }
 
-    if (user.role === "STAFF" && user.employmentStatus !== "ACTIVE") {
+    const retired = user.retirementDate && user.retirementDate <= new Date();
+    if (user.role === "STAFF" && retired) {
       return NextResponse.redirect(new URL(`${retryPath}?error=inactive`, request.url), 303);
     }
 
