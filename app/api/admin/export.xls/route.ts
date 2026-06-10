@@ -28,6 +28,10 @@ function leaveDays(minutes: number) {
   return minutesToHours(minutes) / 8;
 }
 
+function yen(value: number) {
+  return Math.round(Number.isFinite(value) ? value : 0);
+}
+
 function sheetName(value: string) {
   return value.replace(/[\\/?*:[\]]/g, "").slice(0, 31) || "sheet";
 }
@@ -104,6 +108,38 @@ export async function GET(request: Request) {
     };
   }
 
+  function payrollForUser(user: (typeof users)[number]) {
+    const summary = summaryForUser(user);
+    const profile = profileSettings.get(user.id);
+    const monthlySalary = profile?.monthlySalary ?? 0;
+    const hourlyWage = profile?.hourlyWage ?? 0;
+    const divisor = Math.max(1, summary.scheduledDays);
+    const dailyUnit = monthlySalary > 0 ? monthlySalary / divisor : 0;
+    const absenceDeduction = profile?.salaryType === "MONTHLY" ? Math.min(monthlySalary, dailyUnit * summary.absenceDays) : 0;
+    const monthlyBasePay = profile?.salaryType === "MONTHLY" ? Math.max(0, monthlySalary - absenceDeduction) : 0;
+    const hourlyBasePay = profile?.salaryType === "HOURLY" ? hourlyWage * summary.workHours : 0;
+    const commuteAllowance = profile?.commuteType === "MONTHLY_FIXED"
+      ? profile.monthlyCommuteAllowance
+      : profile?.commuteType === "DAILY"
+        ? profile.dailyCommuteAllowance * summary.attendanceDays
+        : 0;
+    return {
+      summary,
+      profile,
+      divisor,
+      dailyUnit: yen(dailyUnit),
+      absenceDeduction: yen(absenceDeduction),
+      basePay: yen(monthlyBasePay + hourlyBasePay),
+      commuteAllowance: yen(commuteAllowance),
+      totalReference: yen(monthlyBasePay + hourlyBasePay + commuteAllowance),
+      note: profile?.salaryType === "MONTHLY"
+        ? "月給÷その月の所定労働日数で欠勤控除"
+        : profile?.salaryType === "HOURLY"
+          ? "勤務時間×時給で参考計算"
+          : "給与未設定"
+    };
+  }
+
   function remainingDaysFor(userId: string, type: string) {
     const grants = grantsByUser.get(userId) ?? [];
     return minutesToHours(grants.filter((grant) => (grant.leaveType ?? "PAID_LEAVE") === type && grant.status !== "EXPIRED").reduce((sum, grant) => sum + grant.remainingMinutes, 0)) / 8;
@@ -141,6 +177,40 @@ export async function GET(request: Request) {
     })
   ];
 
+  const payrollRows = [
+    rowXml([{ value: `給与計算用参考 ${month}`, style: "Title" }]),
+    rowXml(["このシートは給与確定ではなく、スプレッドシート・社労士確認用の参考です。月給者の欠勤控除は「月給 ÷ その月の所定労働日数」で計算します。"]),
+    rowXml([]),
+    rowXml(["部署", "職種", "雇用形態", "氏名", "給与形態", "月給", "時給", "所定労働日数", "出勤実日数", "欠勤日数", "総勤務時間", "1日控除単価", "欠勤控除参考", "基本給参考", "交通費区分", "交通費参考", "参考合計", "計算メモ"], "Header"),
+    ...users.map((user) => {
+      const payroll = payrollForUser(user);
+      const profile = payroll.profile;
+      const salaryTypeLabel = profile?.salaryType === "MONTHLY" ? "月給" : profile?.salaryType === "HOURLY" ? "時給" : "未設定";
+      const commuteTypeLabel = profile?.commuteType === "MONTHLY_FIXED" ? "月固定" : profile?.commuteType === "DAILY" ? "出勤日ごと" : "未設定";
+      const rowStyle = payroll.summary.absenceDays > 0 ? "Notice" : "Default";
+      return rowXml([
+        user.department,
+        user.jobTitle ?? "",
+        profile?.employmentType ?? "正社員",
+        user.name,
+        salaryTypeLabel,
+        profile?.monthlySalary ?? 0,
+        profile?.hourlyWage ?? 0,
+        payroll.divisor,
+        payroll.summary.attendanceDays,
+        payroll.summary.absenceDays,
+        payroll.summary.workHours,
+        payroll.dailyUnit,
+        payroll.absenceDeduction,
+        payroll.basePay,
+        commuteTypeLabel,
+        payroll.commuteAllowance,
+        payroll.totalReference,
+        payroll.note
+      ], rowStyle);
+    })
+  ];
+
   const staffSheets = users.map((user) => {
     const summary = summaryForUser(user);
     const profile = profileSettings.get(user.id);
@@ -158,6 +228,14 @@ export async function GET(request: Request) {
       rowXml(["月次サマリー"], "Section"),
       rowXml(["予定勤務日数", "出勤実日数", "有給日数", "振休日数", "代休日数", "欠勤日数", "未打刻/退勤漏れ", "確認用合計", "総勤務時間", "残業目安", "深夜目安", "オンコール平日", "オンコール土日祝", "緊急訪問", "休日出勤"], "Header"),
       rowXml([summary.scheduledDays, summary.attendanceDays, summary.paidLeaveDays, summary.compensatoryDays, summary.substituteDays, summary.absenceDays, summary.missing, `${summary.accountedDays}/${summary.scheduledDays}`, summary.workHours, summary.overtimeHours, summary.nightHours, summary.onCallWeekday, summary.onCallHoliday, summary.emergencyVisits, summary.holidayWork], summary.missing > 0 ? "Alert" : "Default"),
+      rowXml(["給与計算用参考"], "Section"),
+      rowXml(["給与形態", "月給", "時給", "所定労働日数", "欠勤日数", "1日控除単価", "欠勤控除参考", "基本給参考", "交通費区分", "交通費参考", "参考合計", "計算メモ"], "Header"),
+      (() => {
+        const payroll = payrollForUser(user);
+        const salaryTypeLabel = payroll.profile?.salaryType === "MONTHLY" ? "月給" : payroll.profile?.salaryType === "HOURLY" ? "時給" : "未設定";
+        const commuteTypeLabel = payroll.profile?.commuteType === "MONTHLY_FIXED" ? "月固定" : payroll.profile?.commuteType === "DAILY" ? "出勤日ごと" : "未設定";
+        return rowXml([salaryTypeLabel, payroll.profile?.monthlySalary ?? 0, payroll.profile?.hourlyWage ?? 0, payroll.divisor, payroll.summary.absenceDays, payroll.dailyUnit, payroll.absenceDeduction, payroll.basePay, commuteTypeLabel, payroll.commuteAllowance, payroll.totalReference, payroll.note], payroll.summary.absenceDays > 0 ? "Notice" : "Default");
+      })(),
       rowXml(["休暇残数"], "Section"),
       rowXml(["有給残日数", "振休残日数", "代休残日数", "半年以内の失効予定"], "Header"),
       rowXml([remainingDaysFor(user.id, "PAID_LEAVE"), remainingDaysFor(user.id, "COMPENSATORY_HOLIDAY"), remainingDaysFor(user.id, "SUBSTITUTE_HOLIDAY"), expiring ? `${expiring.expiresAt} / ${minutesToHours(expiring.remainingMinutes) / 8}日` : ""]),
@@ -200,6 +278,7 @@ export async function GET(request: Request) {
 <Style ss:ID="Muted"><Interior ss:Color="#F3F4F6" ss:Pattern="Solid"/><Font ss:Color="#756A60"/></Style>
 </Styles>
 ${worksheet("全体サマリー", summaryRows)}
+${worksheet("給与計算用参考", payrollRows)}
 ${staffSheets.join("")}
 </Workbook>`;
 

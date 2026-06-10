@@ -105,6 +105,38 @@ export function StaffSettingsForm({ users, jobTitles }: Props) {
           <option value="その他">その他</option>
         </select>
       </label>
+      <label>
+        給与形態
+        <select name="salaryType" defaultValue="NONE">
+          <option value="NONE">未設定</option>
+          <option value="MONTHLY">月給</option>
+          <option value="HOURLY">時給</option>
+        </select>
+      </label>
+      <label>
+        月給
+        <input name="monthlySalary" type="number" min="0" step="1" placeholder="例: 250000" />
+      </label>
+      <label>
+        時給
+        <input name="hourlyWage" type="number" min="0" step="1" placeholder="例: 1500" />
+      </label>
+      <label>
+        交通費
+        <select name="commuteType" defaultValue="NONE">
+          <option value="NONE">未設定</option>
+          <option value="MONTHLY_FIXED">月固定</option>
+          <option value="DAILY">出勤日ごと</option>
+        </select>
+      </label>
+      <label>
+        月固定交通費
+        <input name="monthlyCommuteAllowance" type="number" min="0" step="1" placeholder="例: 10000" />
+      </label>
+      <label>
+        1日交通費
+        <input name="dailyCommuteAllowance" type="number" min="0" step="1" placeholder="例: 500" />
+      </label>
       <fieldset className="weekday-picker">
         <legend>勤務曜日</legend>
         {[

@@ -586,6 +586,38 @@ export default async function AdminPage({ searchParams }: Props) {
                 </select>
               </label>
               <label>
+                給与形態
+                <select name="salaryType" defaultValue="NONE">
+                  <option value="NONE">未設定</option>
+                  <option value="MONTHLY">月給</option>
+                  <option value="HOURLY">時給</option>
+                </select>
+              </label>
+              <label>
+                月給
+                <input name="monthlySalary" type="number" min="0" step="1" placeholder="例: 250000" />
+              </label>
+              <label>
+                時給
+                <input name="hourlyWage" type="number" min="0" step="1" placeholder="例: 1500" />
+              </label>
+              <label>
+                交通費
+                <select name="commuteType" defaultValue="NONE">
+                  <option value="NONE">未設定</option>
+                  <option value="MONTHLY_FIXED">月固定</option>
+                  <option value="DAILY">出勤日ごと</option>
+                </select>
+              </label>
+              <label>
+                月固定交通費
+                <input name="monthlyCommuteAllowance" type="number" min="0" step="1" placeholder="例: 10000" />
+              </label>
+              <label>
+                1日交通費
+                <input name="dailyCommuteAllowance" type="number" min="0" step="1" placeholder="例: 500" />
+              </label>
+              <label>
                 部署
                 <input name="department" defaultValue="訪問看護" required />
               </label>
@@ -626,7 +658,7 @@ export default async function AdminPage({ searchParams }: Props) {
         <details className="accordion-card">
           <summary className="accordion-summary">既存スタッフの勤務設定を変更</summary>
           <div className="accordion-body">
-            <p className="muted">パートさんなど、週の所定労働日数・時間を適用開始日つきで設定します。有給の自動付与は付与日時点の設定で計算します。</p>
+            <p className="muted">パートさんなど、週の所定労働日数・時間を適用開始日つきで設定します。有給の自動付与は付与日時点の設定で計算します。給与欄はExcel出力用の参考計算に使い、欠勤控除は月給をその月の所定労働日数で割ります。</p>
             <StaffSettingsForm users={allStaffUsers.map((user) => ({ id: user.id, name: user.employmentStatus === "ACTIVE" ? user.name : `${user.name}（退職）` }))} jobTitles={jobTitles} />
           </div>
         </details>

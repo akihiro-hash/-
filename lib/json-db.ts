@@ -116,6 +116,12 @@ export type WorkingWeekdaySetting = {
 export type StaffProfileSetting = {
   employmentType: string;
   workingWeekdays: number[];
+  salaryType: "NONE" | "MONTHLY" | "HOURLY";
+  monthlySalary: number;
+  hourlyWage: number;
+  commuteType: "NONE" | "MONTHLY_FIXED" | "DAILY";
+  monthlyCommuteAllowance: number;
+  dailyCommuteAllowance: number;
 };
 
 type DbSnapshot = {
@@ -455,6 +461,17 @@ function parseAuditDetails(detailsJson?: string | null) {
   }
 }
 
+function detailString(details: Record<string, unknown>, key: string, fallback: string) {
+  const value = details[key];
+  return typeof value === "string" && value ? value : fallback;
+}
+
+function detailNumber(details: Record<string, unknown>, key: string) {
+  const value = details[key];
+  const number = typeof value === "number" ? value : Number(value ?? 0);
+  return Number.isFinite(number) ? Math.max(0, number) : 0;
+}
+
 export function normalizeWorkingWeekdays(values: unknown[]) {
   const weekdays = values
     .map((value) => Number(value))
@@ -704,9 +721,18 @@ export async function getStaffProfileSettings(userIds: string[]) {
   for (const log of logs) {
     if (!log.entityId || settings.has(log.entityId)) continue;
     const details = parseAuditDetails(log.detailsJson);
-    const employmentType = typeof details.employmentType === "string" ? details.employmentType : "正社員";
+    const employmentType = detailString(details, "employmentType", "正社員");
     const workingWeekdays = Array.isArray(details.workingWeekdays) ? normalizeWorkingWeekdays(details.workingWeekdays) : [];
-    settings.set(log.entityId, { employmentType, workingWeekdays });
+    settings.set(log.entityId, {
+      employmentType,
+      workingWeekdays,
+      salaryType: detailString(details, "salaryType", "NONE") as StaffProfileSetting["salaryType"],
+      monthlySalary: detailNumber(details, "monthlySalary"),
+      hourlyWage: detailNumber(details, "hourlyWage"),
+      commuteType: detailString(details, "commuteType", "NONE") as StaffProfileSetting["commuteType"],
+      monthlyCommuteAllowance: detailNumber(details, "monthlyCommuteAllowance"),
+      dailyCommuteAllowance: detailNumber(details, "dailyCommuteAllowance")
+    });
   }
   return settings;
 }

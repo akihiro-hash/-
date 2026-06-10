@@ -28,6 +28,12 @@ export async function POST(request: Request) {
       employmentStatus: String(form.get("employmentStatus") ?? "ACTIVE"),
       retirementDate: String(form.get("retirementDate") ?? ""),
       employmentType: String(form.get("employmentType") || "正社員"),
+      salaryType: String(form.get("salaryType") || "NONE"),
+      monthlySalary: Number(form.get("monthlySalary") || 0),
+      hourlyWage: Number(form.get("hourlyWage") || 0),
+      commuteType: String(form.get("commuteType") || "NONE"),
+      monthlyCommuteAllowance: Number(form.get("monthlyCommuteAllowance") || 0),
+      dailyCommuteAllowance: Number(form.get("dailyCommuteAllowance") || 0),
       workingWeekdays: normalizeWorkingWeekdays(form.getAll("workingWeekdays"))
     }
   });
