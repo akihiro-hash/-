@@ -4,7 +4,7 @@ import { StaffQuickNav } from "@/components/StaffQuickNav";
 import { DailyOperationsForm } from "@/components/StaffForms";
 import { PasswordChangeForm } from "@/components/PasswordChangeForm";
 import { requireUser } from "@/lib/auth";
-import { findAttendanceRecord, getStandardWorkForDate, getUserMonthAttendanceRecords, getWorkingWeekdaySettings, isScheduledWorkday } from "@/lib/json-db";
+import { getStandardWorkMap, getUserMonthAttendanceRecords, getWorkingWeekdaySettings, isScheduledWorkday } from "@/lib/json-db";
 import { getJpHolidayName } from "@/lib/jp-holidays";
 import { addDays, formatTime, minutesToHours, toJstDateKey } from "@/lib/time";
 
@@ -17,14 +17,16 @@ export default async function StaffPage() {
   const todayKey = toJstDateKey();
   const month = todayKey.slice(0, 7);
   const yesterdayKey = toJstDateKey(addDays(new Date(), -1));
-  const [today, yesterday, todayStandardWork, monthRecords, workingWeekdaySettings] = await Promise.all([
-    findAttendanceRecord(user.id, todayKey),
-    findAttendanceRecord(user.id, yesterdayKey),
-    getStandardWorkForDate(user.id, todayKey),
+  const daysElapsed = Number(todayKey.slice(8, 10));
+  const [monthRecords, standardWorkByDate, workingWeekdaySettings] = await Promise.all([
     getUserMonthAttendanceRecords(user.id, month),
+    getStandardWorkMap(user.id, month, daysElapsed),
     getWorkingWeekdaySettings([user.id])
   ]);
   const recordMap = new Map(monthRecords.map((record) => [record.workDate, record]));
+  const today = recordMap.get(todayKey);
+  const yesterday = recordMap.get(yesterdayKey);
+  const todayStandardWork = standardWorkByDate[todayKey] ?? { start: "09:00", end: "18:00", label: "9:00-18:00" };
   const staffAlerts = Array.from({ length: Number(todayKey.slice(8, 10)) - 1 }, (_, index) => {
     const dateKey = `${month}-${String(index + 1).padStart(2, "0")}`;
     if (!isScheduledWorkday(user, dateKey, workingWeekdaySettings) || getJpHolidayName(dateKey)) return null;
@@ -66,15 +68,15 @@ export default async function StaffPage() {
         <div className="metric-row">
           <div className="metric">
             <span>出勤</span>
-            <strong>{formatTime(today.clockInAt ? new Date(today.clockInAt) : null) || "--:--"}</strong>
+            <strong>{formatTime(today?.clockInAt ? new Date(today.clockInAt) : null) || "--:--"}</strong>
           </div>
           <div className="metric">
             <span>退勤</span>
-            <strong>{formatTime(today.clockOutAt ? new Date(today.clockOutAt) : null) || "--:--"}</strong>
+            <strong>{formatTime(today?.clockOutAt ? new Date(today.clockOutAt) : null) || "--:--"}</strong>
           </div>
           <div className="metric">
             <span>勤務</span>
-            <strong>{minutesToHours(today.workMins)}h</strong>
+            <strong>{minutesToHours(today?.workMins ?? 0)}h</strong>
           </div>
         </div>
         <div className="clock-grid no-print">
@@ -86,7 +88,7 @@ export default async function StaffPage() {
 
       <section className="card">
         <h2>オンコール・緊急訪問</h2>
-        <DailyOperationsForm onCall={today.onCall} yesterdayVisits={yesterday.emergencyVisits} />
+        <DailyOperationsForm onCall={today?.onCall ?? false} yesterdayVisits={yesterday?.emergencyVisits ?? 0} />
       </section>
 
       <section className="card stack">

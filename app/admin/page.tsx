@@ -2,8 +2,8 @@ import { AdminDecisionButtons, PrintButton } from "@/components/AdminActions";
 import { AdminHelpModal } from "@/components/AdminHelpModal";
 import { StaffSettingsForm } from "@/components/StaffSettingsForm";
 import { requireAdmin } from "@/lib/auth";
-import { getMonthData, getWorkingWeekdaySettings, isScheduledWorkday, leaveSummary } from "@/lib/json-db";
-import { formatTime, getJstWeekday, minutesToHours, monthRange, toJstDateKey } from "@/lib/time";
+import { getMonthData, getWorkingWeekdaySettings, isScheduledWorkday } from "@/lib/json-db";
+import { addDays, formatTime, getJstWeekday, minutesToHours, monthRange, parseJstDate, toJstDateKey } from "@/lib/time";
 import { getJpHolidayName } from "@/lib/jp-holidays";
 
 export const dynamic = "force-dynamic";
@@ -79,13 +79,18 @@ export default async function AdminPage({ searchParams }: Props) {
   const month = params.month ?? toJstDateKey().slice(0, 7);
   const { days } = monthRange(month);
   const { users, allStaffUsers, records, leaves, correctionRequests, leaveRequests, correctionLogs, leaveRequestHistory, paidLeaveGrants, auditLogs, monthClosed } = await getMonthData(month);
-  const [expiringSummaries, workingWeekdaySettings] = await Promise.all([
-    Promise.all(users.map(async (user) => ({ user, summary: await leaveSummary(user.id) }))),
-    getWorkingWeekdaySettings(users.map((user) => user.id))
-  ]);
+  const workingWeekdaySettings = await getWorkingWeekdaySettings(users.map((user) => user.id));
   const userName = new Map(users.map((user) => [user.id, user.name]));
+  const userMap = new Map(users.map((user) => [user.id, user]));
   const recordMap = new Map(records.map((record) => [`${record.userId}:${record.workDate}`, record]));
   const todayKey = toJstDateKey();
+  const expiringThreshold = addDays(new Date(), 180);
+  const expiringPaidLeaveGrants = paidLeaveGrants.filter((grant) =>
+    (grant.leaveType ?? "PAID_LEAVE") === "PAID_LEAVE" &&
+    grant.remainingMinutes > 0 &&
+    parseJstDate(grant.expiresAt) <= expiringThreshold &&
+    !!userMap.get(grant.userId)
+  );
   const overtimeByUser = new Map<string, number>();
   for (const record of records) {
     overtimeByUser.set(record.userId, (overtimeByUser.get(record.userId) ?? 0) + record.overtimeMins);
@@ -235,18 +240,16 @@ export default async function AdminPage({ searchParams }: Props) {
         </section>
       )}
 
-      {expiringSummaries.some((item) => item.summary.expiring.length > 0) && (
+      {expiringPaidLeaveGrants.length > 0 && (
         <section className="card alert no-print">
           <h2>有給失効アラート</h2>
           <div className="day-list">
-            {expiringSummaries.flatMap(({ user, summary }) =>
-              summary.expiring.map((grant) => (
-                <div className="day-item" key={grant.id}>
-                  <strong>{user.name}</strong>
-                  <span>{grant.expiresAt} までに {minutesToHours(grant.remainingMinutes)}h が失効予定</span>
-                </div>
-              ))
-            )}
+            {expiringPaidLeaveGrants.map((grant) => (
+              <div className="day-item" key={grant.id}>
+                <strong>{userName.get(grant.userId)}</strong>
+                <span>{grant.expiresAt} までに {minutesToHours(grant.remainingMinutes)}h が失効予定</span>
+              </div>
+            ))}
           </div>
         </section>
       )}
