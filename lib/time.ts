@@ -10,6 +10,11 @@ export function parseJstDate(dateKey: string) {
   return new Date(`${dateKey}T00:00:00+09:00`);
 }
 
+export function getJstWeekday(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
 export function monthRange(monthKey: string) {
   const [year, month] = monthKey.split("-").map(Number);
   const start = new Date(Date.UTC(year, month - 1, 1) - JST_OFFSET_MINS * 60 * 1000);

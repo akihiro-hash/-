@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getJpHolidayName } from "@/lib/jp-holidays";
+import { getJstWeekday } from "@/lib/time";
 
 function useSubmit() {
   const router = useRouter();
@@ -129,7 +130,7 @@ export function DirectAttendanceCorrectionForm({
   const { pending, submit, message } = useSubmit();
   const registered = new Set(registeredDates);
   const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
-  const firstWeekday = new Date(`${month}-01T00:00:00+09:00`).getDay();
+  const firstWeekday = getJstWeekday(`${month}-01`);
   return (
     <form className="stack" onSubmit={(event) => { event.preventDefault(); submit("/api/attendance-corrections", event.currentTarget, "出退勤と日次情報を修正しました"); }}>
       {message && <p className="success-note">{message}</p>}
@@ -148,8 +149,7 @@ export function DirectAttendanceCorrectionForm({
           const day = index + 1;
           const dateKey = `${month}-${String(day).padStart(2, "0")}`;
           const isRegistered = registered.has(dateKey);
-          const date = new Date(`${dateKey}T00:00:00+09:00`);
-          const weekday = date.getDay();
+          const weekday = getJstWeekday(dateKey);
           const holiday = getJpHolidayName(dateKey);
           return (
             <button

@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { getMonthData, getStaffProfileSettings, getWorkingWeekdaySettings, isScheduledWorkday } from "@/lib/json-db";
-import { formatTime, minutesToHours, toJstDateKey } from "@/lib/time";
+import { formatTime, getJstWeekday, minutesToHours, toJstDateKey } from "@/lib/time";
 import { getJpHolidayName } from "@/lib/jp-holidays";
 
 type Cell = string | number | { value: string | number; style?: string };
@@ -20,7 +20,7 @@ function monthDateKeys(month: string) {
 }
 
 function isHolidayOrWeekend(dateKey: string) {
-  const weekday = new Date(`${dateKey}T00:00:00+09:00`).getDay();
+  const weekday = getJstWeekday(dateKey);
   return weekday === 0 || weekday === 6 || !!getJpHolidayName(dateKey);
 }
 
@@ -243,7 +243,7 @@ export async function GET(request: Request) {
       rowXml(["日付", "曜日", "祝日", "出勤", "退勤", "休憩時間", "勤務時間", "残業目安", "深夜目安", "状態", "オンコール", "緊急訪問", "休暇種別", "休暇単位", "休暇状態", "休暇理由"], "Header"),
       ...userRecords.map((record) => {
         const leave = leaveMap.get(`${record.userId}:${record.workDate}`);
-        const weekday = weekdayLabels[new Date(`${record.workDate}T00:00:00+09:00`).getDay()];
+        const weekday = weekdayLabels[getJstWeekday(record.workDate)];
         const rowStyle = record.status === "MISSING_CLOCK" ? "Alert" : record.overtimeMins >= 60 ? "Warn" : isHolidayOrWeekend(record.workDate) && record.clockInAt ? "Notice" : record.onCall ? "OnCall" : "Default";
         return rowXml([record.workDate, weekday, getJpHolidayName(record.workDate) ?? "", formatTime(record.clockInAt ? new Date(record.clockInAt) : null), formatTime(record.clockOutAt ? new Date(record.clockOutAt) : null), minutesToHours(record.totalBreakMins), minutesToHours(record.workMins), minutesToHours(record.overtimeMins), minutesToHours(record.nightMins), record.status, record.onCall ? "あり" : "", record.emergencyVisits, leave?.leaveType ?? "", leave?.unit ?? "", leave?.status ?? "", leave?.reason ?? ""], rowStyle);
       }),

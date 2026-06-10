@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { getMonthData, getStaffProfileSettings, getWorkingWeekdaySettings, isScheduledWorkday } from "@/lib/json-db";
-import { formatTime, minutesToHours, toJstDateKey } from "@/lib/time";
+import { formatTime, getJstWeekday, minutesToHours, toJstDateKey } from "@/lib/time";
 import { getJpHolidayName } from "@/lib/jp-holidays";
 
 function csvCell(value: unknown) {
@@ -15,7 +15,7 @@ function monthDateKeys(month: string) {
 }
 
 function isHolidayOrWeekend(dateKey: string) {
-  const weekday = new Date(`${dateKey}T00:00:00+09:00`).getDay();
+  const weekday = getJstWeekday(dateKey);
   return weekday === 0 || weekday === 6 || !!getJpHolidayName(dateKey);
 }
 
@@ -178,7 +178,7 @@ export async function GET(request: Request) {
         ["日別明細"],
         ["日付", "曜日", "祝日", "出勤", "退勤", "休憩時間", "勤務時間", "残業目安", "深夜目安", "状態", "オンコール", "緊急訪問", "休暇種別", "休暇単位", "休暇状態", "休暇理由"],
         ...userRecords.map((record) => {
-          const weekday = weekdayLabels[new Date(`${record.workDate}T00:00:00+09:00`).getDay()];
+          const weekday = weekdayLabels[getJstWeekday(record.workDate)];
           const leave = leaveMap.get(`${record.userId}:${record.workDate}`);
           return [
             record.workDate,

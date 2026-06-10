@@ -3,7 +3,7 @@ import { AdminHelpModal } from "@/components/AdminHelpModal";
 import { StaffSettingsForm } from "@/components/StaffSettingsForm";
 import { requireAdmin } from "@/lib/auth";
 import { getMonthData, getWorkingWeekdaySettings, isScheduledWorkday, leaveSummary } from "@/lib/json-db";
-import { formatTime, minutesToHours, monthRange, toJstDateKey } from "@/lib/time";
+import { formatTime, getJstWeekday, minutesToHours, monthRange, toJstDateKey } from "@/lib/time";
 import { getJpHolidayName } from "@/lib/jp-holidays";
 
 export const dynamic = "force-dynamic";
@@ -119,7 +119,7 @@ export default async function AdminPage({ searchParams }: Props) {
   const holidayWorkCandidates = records
     .filter((record) => {
       if (!record.clockInAt) return false;
-      const weekday = new Date(`${record.workDate}T00:00:00+09:00`).getDay();
+      const weekday = getJstWeekday(record.workDate);
       return weekday === 0 || weekday === 6 || !!getJpHolidayName(record.workDate);
     })
     .map((record) => ({ record, user: users.find((user) => user.id === record.userId), holiday: getJpHolidayName(record.workDate) }));
@@ -297,7 +297,7 @@ export default async function AdminPage({ searchParams }: Props) {
                   {Array.from({ length: days }, (_, index) => {
                     const dateKey = `${month}-${String(index + 1).padStart(2, "0")}`;
                     const record = recordMap.get(`${user.id}:${dateKey}`);
-                    const weekday = new Date(`${dateKey}T00:00:00+09:00`).getDay();
+                    const weekday = getJstWeekday(dateKey);
                     const isHolidayWork = !!record?.clockInAt && (weekday === 0 || weekday === 6 || !!getJpHolidayName(dateKey));
                     const cellLeaves = leaveMap.get(`${user.id}:${dateKey}`) ?? [];
                     const approvedLeave = cellLeaves.find((leave) => leave.status === "APPROVED");

@@ -1,6 +1,6 @@
 import { randomBytes, pbkdf2Sync } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { addDays, addYears, parseJstDate, toJstDateKey } from "@/lib/time";
+import { addDays, addYears, getJstWeekday, parseJstDate, toJstDateKey } from "@/lib/time";
 
 export type User = {
   id: string;
@@ -487,7 +487,7 @@ function defaultWorkingWeekdays(weeklyWorkDays: number) {
 
 export function isScheduledWorkday(user: Pick<User, "id" | "weeklyWorkDays" | "retirementDate">, dateKey: string, settings: Map<string, WorkingWeekdaySetting[]>) {
   if (user.retirementDate && dateKey > user.retirementDate) return false;
-  const weekday = new Date(`${dateKey}T00:00:00+09:00`).getDay();
+  const weekday = getJstWeekday(dateKey);
   const candidates = (settings.get(user.id) ?? [])
     .filter((setting) => setting.effectiveFrom <= dateKey)
     .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
