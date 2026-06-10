@@ -1,5 +1,4 @@
 import { AdminDecisionButtons, PrintButton } from "@/components/AdminActions";
-import { AdminAccountForm } from "@/components/AdminAccountForm";
 import { AdminHelpModal } from "@/components/AdminHelpModal";
 import { StaffSettingsForm } from "@/components/StaffSettingsForm";
 import { requireAdmin } from "@/lib/auth";
@@ -683,7 +682,13 @@ export default async function AdminPage({ searchParams }: Props) {
           </div>
         </details>
 
-        <AdminAccountForm email={admin.email} />
+        <details className="accordion-card">
+          <summary className="accordion-summary">管理者アカウント設定</summary>
+          <div className="accordion-body">
+            <p className="muted">管理者メールアドレス・パスワードを変更します。現在のパスワード確認が必要です。</p>
+            <a className="secondary" href="/admin/account">管理者アカウント設定を開く</a>
+          </div>
+        </details>
       </section>
     </main>
   );
